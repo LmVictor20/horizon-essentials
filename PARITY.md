@@ -16,55 +16,57 @@ Generated once by tools/parity_table.py from plugin.yml; each area keeps its own
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /back | core | return | todo | |
-| /bottom | core |  | todo | |
-| /delhome | core | remhome, rmhome | todo | |
-| /delwarp | core | remwarp, rmwarp | todo | |
-| /home | core | homes | todo | |
-| /jump | core | j, jumpto | todo | |
-| /renamehome | core |  | todo | |
-| /sethome | core | createhome | todo | |
-| /settpr | core | settprandom | todo | |
-| /setwarp | core | createwarp | todo | |
-| /top | core |  | todo | |
-| /tp | core | tele, teleport, tp2p | todo | |
-| /tpa | core | call, tpask | todo | |
-| /tpaall | core |  | todo | |
-| /tpacancel | core |  | todo | |
-| /tpaccept | core | tpyes | todo | |
-| /tpahere | core |  | todo | |
-| /tpall | core |  | todo | |
-| /tpauto | core |  | todo | |
-| /tpdeny | core | tpno | todo | |
-| /tphere | core | s | todo | |
-| /tpo | core |  | todo | |
-| /tpoffline | core | otp, offlinetp, tpoff, tpoffline | todo | |
-| /tpohere | core |  | todo | |
-| /tppos | core |  | todo | |
-| /tpr | core | tprandom | todo | |
-| /tptoggle | core |  | todo | |
-| /warp | core | warps | todo | |
-| /warpinfo | core |  | todo | |
-| /world | core |  | todo | |
-| /setspawn | spawn |  | todo | |
-| /spawn | spawn |  | todo | |
+| /back | core | return | done | L1 + L3 (tp_homes): to the last location, back.into.<world>, others, console; /back on teleport and death |
+| /bottom | core |  | done | L1: LocationUtil.getSafeDestination from the bottom of the column |
+| /delhome | core | remhome, rmhome | done | L1: player:name, `*`, numbered homes, console |
+| /delwarp | core | remwarp, rmwarp | done | L1 |
+| /home | core | homes | done | L1 + L3 (tp_homes): list with bed, numbers, player:name, bed, spawn-if-no-home, world-home-permissions |
+| /jump | core | j, jumpto | partial | L1: jump to the target block (safe, centered); `/jump lock` toggles the flag but the fly-click jump itself (right click with a compass, powertool-style) is not wired (needs the items area's interact hook) |
+| /renamehome | core |  | done | L1 |
+| /sethome | core | createhome | done | L1 + L3 (tp_homes): limits, name forced to `home` at a limit of 1, invalid names, unsafe spots, confirm-home-overwrite, others |
+| /settpr | core | settprandom | done | L1 + L3 (tp_places): center/minrange/maxrange in tpr.yml |
+| /setwarp | core | createwarp | done | L1 + L3 (tp_places): warps/<sanitized>.yml with name and lastowner, overwrite node, similar names, reserved names |
+| /top | core |  | done | L1 + L3 (tp_homes) |
+| /tp | core | tele, teleport, tp2p | done | L1 + L3 (tp_requests): player, player to player, positions (~ relative, 30M bound), offline hint, console forms |
+| /tpa | core | call, tpask | partial | L1 + L3 (tp_requests); requests from players the target ignores are not dropped yet (ignore lists are the social area's: TODO, CORE-REQUESTS #3) |
+| /tpaall | core |  | done | L1 |
+| /tpacancel | core |  | done | L1 |
+| /tpaccept | core | tpyes | done | L1 + L3 (tp_requests): newest first, by name, `*`/all, here-requests use the stored location |
+| /tpahere | core |  | partial | L1 + L3 (tp_requests); ignore lists not honoured yet (social, TODO) |
+| /tpall | core |  | done | L1 |
+| /tpauto | core |  | done | L1 |
+| /tpdeny | core | tpno | done | L1 + L3 (tp_requests) |
+| /tphere | core | s | done | L1 + L3 (tp_requests) |
+| /tpo | core |  | done | L1 |
+| /tpoffline | core | otp, offlinetp, tpoff, tpoffline | done | L1: to the logout location |
+| /tpohere | core |  | done | L1 |
+| /tppos | core |  | done | L1: yaw/pitch/world forms, console form |
+| /tpr | core | tprandom | partial | L1 + L3 (tp_places); random spots in chunks that are not loaded count as failed attempts (no synchronous chunk load from a mod), so with the default max-range (half the world border) /tpr mostly lands on the center: set a max-range around loaded terrain. No location cache (cache-threshold): spots are computed on demand |
+| /tptoggle | core |  | done | L1 |
+| /warp | core | warps | done | L1 + L3 (tp_places): pages of 20, warp.list, per-warp-permission, others, console |
+| /warpinfo | core |  | done | L1 + L3 (tp_places) |
+| /world | core |  | done | L1: nether toggle with the 8:1 scale, by name or index, invalid-world help |
+| /setspawn | spawn |  | done | L1 + L3 (tp_places): spawn.yml spawns.<group> |
+| /spawn | spawn |  | done | L1 + L3 (tp_places): group spawn, default, world spawn; others; console |
 
 **Features (tp)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| teleport-delay warmup, cancelled by moving or damage (essentials.teleport.timer.*) | todo | |
-| teleport-cooldown and its bypasses | todo | |
-| teleport-safety / force-safe-teleport-location / is-water-safe | todo | |
-| teleport-invulnerability | todo | |
-| teleport-to-center | todo | |
-| /back on teleport and on death (back.ondeath, back.into.<world>) | todo | |
-| tpa-accept-cancellation, tpa-max-requests | todo | |
-| sethome-multiple groups and limits, confirm-home-overwrite, world-home-permissions | todo | |
-| per-warp-permission, warp list paging | todo | |
-| Spawn module: spawn-on-join, newbies (spawnpoint, kit, announce-format), respawn-at-home(-bed), respawn-at-anchor | todo | |
-| random-spawn-location, random-respawn-location, tpr.yml areas and excluded biomes | todo | |
-| world-teleport-permissions | todo | |
+| teleport-delay warmup, cancelled by moving or damage (essentials.teleport.timer.*) | done | L1: checked every second like AsyncTimedTeleport (moving about 3 blocks or losing health cancels); timer.bypass, timer.move |
+| teleport-cooldown and its bypasses | done | L1: timestamps.lastteleport; cooldown.bypass, .back, .tpa by teleport type |
+| teleport-safety / force-safe-teleport-location / is-water-safe | partial | L1 + L3 (/top): LocationUtil ported (hollow and damaging blocks, nether roof via consider-world-height-for-teleport-safety); a destination in a chunk that is not loaded is used as given (centered) since its blocks cannot be read; the world border is not consulted (vanilla's is never in the way) |
+| teleport-invulnerability | partial | L1: Host::set_invulnerable for N s after a command teleport (all damage, not only PvP, since there is no PvP-only damage hook); the damage listener also cancels player attacks if the world area routes damage |
+| teleport-to-center | done | L1 |
+| /back on teleport and on death (back.ondeath, back.into.<world>) | done | L1 + L3 (tp_homes): deaths are seen by polling Guest.dead each tick (Host::is_dead) because Game::guest_die holds macros, which HEAD refuses |
+| tpa-accept-cancellation, tpa-max-requests | done | L1: expiry message; at the limit the newest request is dropped (as EssentialsX) |
+| sethome-multiple groups and limits, confirm-home-overwrite, world-home-permissions | done | L1 |
+| per-warp-permission, warp list paging | done | L1 |
+| Spawn module: spawn-on-join, newbies (spawnpoint, kit, announce-format), respawn-at-home(-bed), respawn-at-anchor | partial | L1 (+ L3 for /spawn, /setspawn): spawn-on-join groups and exempt, newbies spawnpoint and announcement, respawn at group spawn / home / bed / anchor, respawn-listener-priority and spawn-join-listener-priority `none`. newbies.kit is not given (items area: TODO, CORE-REQUESTS #4). The respawn point is applied one tick after vanilla respawns the player (a second teleport); respawn is not covered at L3 (ess-bot cannot respawn) |
+| random-spawn-location, random-respawn-location, tpr.yml areas and excluded biomes | partial | L1: see /tpr (unloaded chunks count as failed attempts; no cache) |
+| world-teleport-permissions | done | L1: tp, tpa, tpahere, tpaccept, tpo, tphere, tppos, tpoffline, world, back |
+
+Area-wide notes (tp): messages name players by their account name (nicknames and prefixes are the social area's, CORE-REQUESTS #2); command costs (`command-costs`, Trade charges) are not taken (economy area).
 
 ## social (21 commands)
 
