@@ -2063,6 +2063,54 @@ pub struct DeathPolicy {
     pub drop: Vec<Item>,
 }
 
+/// The death rules for a player, without touching anything (the glue caches them for its death hook).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DeathSettings {
+    pub keep_inventory: bool,
+    pub keep_level: bool,
+    /// `vanishing-items-policy` / `binding-items-policy`: keep, drop or delete.
+    pub vanishing: String,
+    pub binding: String,
+}
+
+pub fn death_settings(ess: &mut Ess, host: &mut dyn Host, player: Uuid) -> DeathSettings {
+    let who = Sender::Player(player);
+    DeathSettings {
+        keep_inventory: ess.has(host, who, "essentials.keepinv"),
+        keep_level: ess.has(host, who, "essentials.keepxp"),
+        vanishing: ess.config_str("vanishing-items-policy").unwrap_or_else(|| "keep".into()).to_lowercase(),
+        binding: ess.config_str("binding-items-policy").unwrap_or_else(|| "keep".into()).to_lowercase(),
+    }
+}
+
+/// Vanilla damage types and the cause each is to Essentials' listeners (see the vocabulary above).
+pub const DAMAGE_TYPES: &[(&str, &str)] = &[
+    ("fall", "fall"), ("in_fire", "fire"), ("campfire", "fire"), ("on_fire", "fire_tick"), ("hot_floor", "fire"), ("lava", "lava"),
+    ("drown", "drowning"), ("in_wall", "suffocation"), ("cramming", "suffocation"), ("cactus", "contact"), ("sweet_berry_bush", "contact"),
+    ("stalagmite", "contact"), ("falling_stalactite", "contact"), ("falling_block", "contact"), ("lightning_bolt", "lightning"),
+    ("wither", "wither"), ("magic", "magic"), ("indirect_magic", "magic"), ("starve", "starvation"), ("out_of_world", "void"),
+    ("generic", "generic"), ("freeze", "freeze"), ("explosion", "explosion:-"), ("player_explosion", "explosion:-"),
+    ("fireball", "explosion:fireball"), ("unattributed_fireball", "explosion:fireball"), ("wither_skull", "explosion:wither_skull"),
+    ("arrow", "projectile:-"), ("trident", "projectile:-"), ("thrown", "projectile:-"), ("mob_projectile", "projectile:-"),
+    ("player_attack", "player:-"), ("mob_attack", "entity:mob"), ("mob_attack_no_aggro", "entity:mob"), ("sting", "entity:mob"),
+    ("dragon_breath", "magic"), ("sonic_boom", "entity:mob"), ("fly_into_wall", "contact"), ("ender_pearl", "fall"),
+];
+
+/// The vanilla damage types Essentials would cancel for a player now (god mode, Protect), and whether all are
+/// cancelled (god). The glue mirrors this onto the player for its damage hook, which can't call Essentials.
+pub fn blocked_damage(ess: &mut Ess, host: &mut dyn Host, player: Uuid) -> (bool, Vec<&'static str>) {
+    if is_god(ess, host, player) {
+        return (true, Vec::new());
+    }
+    let mut out = Vec::new();
+    for (vanilla, cause) in DAMAGE_TYPES {
+        if ess.on_damage(host, player, cause, 0.0) == Allow::No {
+            out.push(*vanilla);
+        }
+    }
+    (false, out)
+}
+
 fn has_enchant(item: &Item, id: &str) -> bool {
     let e = item.components.get("enchantments").or_else(|| item.components.get("minecraft:enchantments"));
     let Some(e) = e else { return false };
@@ -2073,13 +2121,12 @@ fn has_enchant(item: &Item, id: &str) -> bool {
 /// Called by the glue before vanilla drops a dying player's inventory: decides keepinv/keepxp and removes cursed
 /// items per `vanishing-items-policy` / `binding-items-policy` (keep, drop, delete).
 pub fn death_policy(ess: &mut Ess, host: &mut dyn Host, player: Uuid) -> DeathPolicy {
-    let who = Sender::Player(player);
-    let mut out = DeathPolicy { keep_inventory: ess.has(host, who, "essentials.keepinv"), keep_level: ess.has(host, who, "essentials.keepxp"), drop: Vec::new() };
+    let settings = death_settings(ess, host, player);
+    let mut out = DeathPolicy { keep_inventory: settings.keep_inventory, keep_level: settings.keep_level, drop: Vec::new() };
     if !out.keep_inventory {
         return out;
     }
-    let vanish = ess.config_str("vanishing-items-policy").unwrap_or_else(|| "keep".into()).to_lowercase();
-    let bind = ess.config_str("binding-items-policy").unwrap_or_else(|| "keep".into()).to_lowercase();
+    let (vanish, bind) = (settings.vanishing, settings.binding);
     if vanish == "keep" && bind == "keep" {
         return out;
     }
@@ -2976,6 +3023,16 @@ mod tests {
     }
 
     // ----- death policies -----------------------------------------------------------------------
+
+    #[test]
+    fn blocked_damage_mirrors_god_and_protect() {
+        let (mut t, carol) = with_player(&["essentials.god"], "protect:\n  disable:\n    fall: true");
+        let (god, list) = crate::game::ess_world::blocked_damage(&mut t.ess, &mut t.host, carol);
+        assert!(!god);
+        assert_eq!(list, ["fall", "ender_pearl"]);
+        t.cmd(carol, "/god");
+        assert_eq!(crate::game::ess_world::blocked_damage(&mut t.ess, &mut t.host, carol), (true, vec![]));
+    }
 
     #[test]
     fn keepinv_keepxp_and_curse_policies() {
