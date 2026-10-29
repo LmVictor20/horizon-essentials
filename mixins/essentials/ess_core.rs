@@ -469,6 +469,14 @@ pub trait Host {
     // ---- area items ----
     // ---- end items ----
     // ---- area economy ----
+    /// Whether the player is sneaking (bulk buying and selling on [Buy]/[Sell] signs).
+    fn sneaking(&mut self, player: Uuid) -> bool {
+        false
+    }
+    /// Whether an item id places a block (`/sell blocks`, `/repair` skips blocks; Material.isBlock).
+    fn item_is_block(&mut self, item: &str) -> bool {
+        false
+    }
     // ---- end economy ----
     // ---- area world ----
     // ---- end world ----

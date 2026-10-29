@@ -117,6 +117,8 @@ mod kit {
         // ---- area items ----
         // ---- end items ----
         // ---- area economy ----
+        /// Players holding sneak (bulk sign trades).
+        pub economy_sneaking: std::collections::HashSet<Uuid>,
         // ---- end economy ----
         // ---- area world ----
         // ---- end world ----
@@ -211,6 +213,7 @@ mod kit {
                 // ---- area items ----
                 // ---- end items ----
                 // ---- area economy ----
+                economy_sneaking: Default::default(),
                 // ---- end economy ----
                 // ---- area world ----
                 // ---- end world ----
@@ -625,6 +628,14 @@ mod kit {
         // ---- area items ----
         // ---- end items ----
         // ---- area economy ----
+        fn sneaking(&mut self, player: Uuid) -> bool {
+            self.economy_sneaking.contains(&player)
+        }
+        fn item_is_block(&mut self, item: &str) -> bool {
+            let id = item.trim_start_matches("minecraft:");
+            id.ends_with("_block") || id.ends_with("_log") || id.ends_with("_planks") || id.ends_with("_sign")
+                || matches!(id, "stone" | "cobblestone" | "dirt" | "torch" | "tnt" | "chest" | "carved_pumpkin" | "spawner" | "bedrock" | "barrier" | "player_head")
+        }
         // ---- end economy ----
         // ---- area world ----
         // ---- end world ----

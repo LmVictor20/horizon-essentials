@@ -218,28 +218,28 @@ Area-wide notes (tp): messages name players by their account name (nicknames and
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /balance | core | bal, money | todo | |
-| /balancetop | core | baltop | todo | |
-| /eco | core | economy | todo | |
-| /pay | core |  | todo | |
-| /payconfirmtoggle | core | payconfirmoff, payconfirmon, payconfirm | todo | |
-| /paytoggle | core | payoff, payon | todo | |
-| /sell | core |  | todo | |
-| /setworth | core |  | todo | |
-| /worth | core | price | todo | |
+| /balance | core | bal, money | done | L1 + L3 (economy_money). Display names: nickname (+nickname-prefix) else name. |
+| /balancetop | core | baltop | done | L1 + L3. 2-minute cache, `force`, 9-line pages, orderBalances over 50 users; computed synchronously. |
+| /eco | core | economy | done | give/take/set/reset, `*`/`**`/uuid/offline targets; L1 + L3. `10%` shows the usage, as EssentialsX's parser does. |
+| /pay | core |  | done | Offline/hidden, `**`, pay.multiple, confirmation, ignore list, max-money refund; L1 + L3. |
+| /payconfirmtoggle | core | payconfirmoff, payconfirmon, payconfirm | done | userdata `confirm-pay`, default-enabled-confirm-commands. |
+| /paytoggle | core | payoff, payon | done | userdata `accepting-pay`, others; L1 + L3. |
+| /sell | core |  | done | hand/item/all/blocks, amounts (-1, 2s), trade-in-stacks, multipliers, named items, console log. Item names: ids, underscore-less ids, custom_items.yml (no items.csv aliases). |
+| /setworth | core |  | done | Writes worth.yml (its comments are not kept). |
+| /worth | core | price | done | worthMeta for damaged items. |
 
 **Features (economy)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| balances, starting-balance, min-money / max-money / eco.loan | todo | |
-| currency-symbol (+suffix) formatting | todo | |
-| economy-log (CSV) | todo | |
-| worth.yml, sell-multipliers, allow-bulk-buy-sell, allow-selling-named-items | todo | |
-| baltop cache, baltop-requirements, entry limit | todo | |
-| pay confirmation, minimum-pay-amount, pay-excludes-ignore-list | todo | |
-| command-costs (incl. chat-shout/question), nocommandcost | todo | |
-| signs: [Balance] [Buy] [Sell] [Trade] [Free] [Disposal] [Enchant] [Repair] [Heal] [Gamemode] [Info] [Kit] [Mail] [RandomTeleport] [Warp] [Anvil] [Cartography] [Grindstone] [Loom] [Smithing] [Workbench] [Spawnmob] [Time] [Weather] [Protection], colour signs, sign-use-per-second, enabledSigns | todo | |
+| balances, starting-balance, min-money / max-money / eco.loan | done | Exact decimals (BigDecimal semantics, scale kept: `50.00`), userdata `money` as a string; disable-eco. |
+| currency-symbol (+suffix) formatting | done | NumberUtil: currency-format, FLOOR rounding, `.00` dropped, currency-symbol-format-locale for common languages. |
+| economy-log (CSV) | done | trade.log lines as Trade.log (incl. update/uuid options); date in the server's locale-free English form. |
+| worth.yml, sell-multipliers, allow-bulk-buy-sell, allow-selling-named-items | partial | All in L1. In game, bulk [Buy]/[Sell] while sneaking with the item never reaches the sign (vanilla uses the held item instead of opening the sign: see CORE-REQUESTS 3). |
+| baltop cache, baltop-requirements, entry limit | done | minimum-playtime uses the play_time statistic of online players; offline players skip it (EssentialsX before 1.15.2 does the same). |
+| pay confirmation, minimum-pay-amount, pay-excludes-ignore-list | done | |
+| command-costs (incl. chat-shout/question), nocommandcost | partial | Charged before the command runs (no post-command hook: CORE-REQUESTS 1), so a failing command still costs. `ess_economy::charge_command_cost(ess, host, player, "chat-shout")` for other areas. |
+| signs: [Balance] [Buy] [Sell] [Trade] [Free] [Disposal] [Enchant] [Repair] [Heal] [Gamemode] [Info] [Kit] [Mail] [RandomTeleport] [Warp] [Anvil] [Cartography] [Grindstone] [Loom] [Smithing] [Workbench] [Spawnmob] [Time] [Weather] [Protection], colour signs, sign-use-per-second, enabledSigns | partial | All 25 signs, create/use/break permissions, [cost] syntax ($, items, exp, times), colours, throttle, unprotected-sign-names, explosion/fire protection: L1 (57 tests). Game glue: sign edits get sign_change on the next tick (a refused edit gets its old text back); right clicks on unwaxed signs work (on the next tick), waxed signs and sneaking clicks don't reach Essentials; breaking and container opening are decided with a last-tick player snapshot (CORE-REQUESTS 2/3). [Kit]/[Mail]/[Info] run `/kit`, `/mail read`, `/info` as the player (their permissions apply); [Warp]/[Spawnmob]/[RandomTeleport] run `/warp`, `/spawnmob`, `/tpr` from the console. [Free] ignores item meta lines; [Enchant] has no item tags/aliases and doesn't check that an enchantment fits the item. Owner data is the name on the sign (no PDC). Signs in levels not in place are unreachable. No L3 (ess-bot can't place or click signs). |
 
 ## world (36 commands)
 
