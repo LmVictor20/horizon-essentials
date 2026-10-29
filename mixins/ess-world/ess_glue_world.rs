@@ -96,12 +96,13 @@ impl GameHost<'_, '_> {
 
     /// Adds or removes a zero `minecraft:luck` modifier the library hooks read.
     fn body_flag(&mut self, player: Uuid, id: &str, on: bool) {
-        let Some(name) = self.guest(player).map(|g| g.name.clone()) else { return };
-        if on {
-            self.console(&format!("attribute {name} minecraft:luck modifier add essentials:{id} 0 add_value"));
-        } else {
-            self.console(&format!("attribute {name} minecraft:luck modifier remove essentials:{id}"));
-        }
+        // Transient, on the body: a new body (respawn) starts without it and `sync_flags` adds it again.
+        let id = format!("essentials:{id}");
+        self.in_turn(player, |g| {
+            if let Some(p) = g.player.as_mut() {
+                let _ = p.set_modifier("minecraft:luck", &id, 0.0, "add_value", on);
+            }
+        });
     }
 
     /// Makes the body flags match `wanted`; a new body (another entity id) gets them all again.
@@ -310,10 +311,15 @@ impl GameHost<'_, '_> {
     }
     pub(super) fn world_set_walk_speed(&mut self, player: Uuid, speed: f32) {
         glue(|g| g.speeds.entry(player).or_insert((0.2, 0.1)).0 = speed);
-        if let Some(name) = self.guest(player).map(|g| g.name.clone()) {
-            // Bukkit: the movement_speed attribute's base is half the walk speed (0.2 -> 0.1).
-            self.console(&format!("attribute {name} minecraft:movement_speed base set {}", speed / 2.0));
-        }
+        // Bukkit: the movement_speed attribute's base is half the walk speed (0.2 -> 0.1).
+        self.in_turn(player, |g| {
+            if let Some(p) = g.player.as_mut() {
+                let key = p.attributes.key("minecraft:movement_speed");
+                if let Some(handle) = p.attributes.get_instance(key).ok().flatten() {
+                    let _ = p.attributes.edit(&handle, |value, observer| value.set_base_value(f64::from(speed) / 2.0, observer));
+                }
+            }
+        });
         self.send_abilities(player);
     }
     pub(super) fn world_speeds(&mut self, player: Uuid) -> (f32, f32) {

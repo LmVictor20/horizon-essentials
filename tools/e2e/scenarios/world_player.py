@@ -47,19 +47,17 @@ def test_heal_feed(t):
 
 
 def test_god_blocks_damage(t):
+    # Standing in lava: god mode keeps Alice alive (the damage hook), and she burns once it is off.
+    import time
     alice = opped(t)
     alice.cmd("/god")
     alice.expect(r"^God mode enabled\.$")
-    # The damage hook needs a second to mirror god mode onto the body.
-    import time
-    time.sleep(1.5)
-    t.console("damage Alice 100")
-    alice.expect_none(r"Alice (died|was|fell|hit)", seconds=3)
+    time.sleep(1.5)  # the hook sees god mode from the next second's mirror
+    t.console("execute at Alice run setblock ~ ~ ~ minecraft:lava")
+    alice.expect_none(r"Alice tried to swim in lava", seconds=6)
     alice.cmd("/god")
     alice.expect(r"^God mode disabled\.$")
-    time.sleep(1.5)
-    t.console("damage Alice 100")
-    alice.expect(r"Alice")
+    t.wait_log(r"Alice tried to swim in lava", timeout=15)
 
 
 def test_time_and_weather(t):
