@@ -308,6 +308,8 @@ struct TpState {
     confirm: HashMap<Uuid, (String, i64)>,
     tp_type: HashMap<Uuid, TpType>,
     jump_lock: HashSet<Uuid>,
+    /// Players seen dead (Host::is_dead) last tick.
+    dead: HashSet<Uuid>,
     seed: u64,
 }
 
@@ -509,7 +511,28 @@ fn after_teleport(ess: &mut Ess, host: &mut dyn Host, p: Uuid) {
     );
 }
 
+/// Deaths and respawns, seen as Host::is_dead changing: `on_death` at the death point, then, when the player
+/// is back, `on_respawn`'s answer moves them (PlayerRespawnEvent.setRespawnLocation).
+fn poll_deaths(ess: &mut Ess, host: &mut dyn Host) {
+    for p in host.online() {
+        let dead = host.is_dead(p);
+        let was = st(ess).dead.contains(&p);
+        if dead && !was {
+            st(ess).dead.insert(p);
+            if let Some(at) = host.location(p) {
+                ess.on_death(host, p, &at);
+            }
+        } else if !dead && was {
+            st(ess).dead.remove(&p);
+            if let Some(at) = ess.on_respawn(host, p) {
+                host.teleport(p, &at);
+            }
+        }
+    }
+}
+
 fn on_tick(ess: &mut Ess, host: &mut dyn Host) {
+    poll_deaths(ess, host);
     let tick = ess.scheduler.tick;
     let due: Vec<Uuid> = st(ess).timers.iter().filter(|(_, t)| t.next <= tick).map(|(o, _)| *o).collect();
     for owner in due {
@@ -545,6 +568,7 @@ fn on_tick(ess: &mut Ess, host: &mut dyn Host) {
 
 fn on_quit(ess: &mut Ess, _host: &mut dyn Host, p: Uuid) {
     st(ess).timers.retain(|owner, t| *owner != p && t.job.teleportee != p);
+    st(ess).dead.remove(&p);
 }
 
 fn on_damage(ess: &mut Ess, host: &mut dyn Host, p: Uuid, cause: &str, _amount: f64) -> Allow {
@@ -568,6 +592,12 @@ fn hollow(ess: &Ess, id: &str) -> bool {
     if matches!(id, "water" | "bubble_column") {
         return ess.config_bool("is-water-safe", false);
     }
+    passable(id)
+}
+
+/// The blocks of `hollow` without water: a block id without the `minecraft:` namespace or state. Also what
+/// /jump looks through (with water: LocationUtil.TRANSPARENT_MATERIALS).
+pub fn passable(id: &str) -> bool {
     id.ends_with("air")
         || id == "light"
         || id.ends_with("_sapling")
@@ -2747,6 +2777,26 @@ mod tests {
         t.ess.on_death(&mut t.host, a, &Loc::new(OW, 70.5, 64.0, 70.5));
         assert!(t.said(a).is_empty());
         assert_eq!(t.userdata(a)["lastlocation"]["x"], 50.5);
+    }
+
+    #[test]
+    fn death_and_respawn_are_seen_through_is_dead() {
+        let mut t = TestServer::with_config("respawn-at-home: true");
+        let a = joined(&mut t, "Alice");
+        t.op("Alice");
+        at(&mut t, a, OW, 12.5, 64.0, 12.5);
+        t.cmd(a, "/sethome");
+        perms(&mut t, "essentials.back.ondeath", "");
+        at(&mut t, a, OW, 50.5, 64.0, 50.5);
+        t.host.dead.insert(a);
+        t.tick(1);
+        assert_eq!(t.said(a), ["Use the /back command to return to your death point."]);
+        assert_eq!(t.userdata(a)["lastlocation"]["x"], 50.5);
+        // Vanilla respawns the player at the world spawn; Essentials then moves them home.
+        t.host.dead.remove(&a);
+        at(&mut t, a, OW, 0.5, 64.0, 0.5);
+        t.tick(1);
+        assert_eq!(xyz(&mut t, a), ow(12.5, 64.0, 12.5));
     }
 
     #[test]

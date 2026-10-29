@@ -440,6 +440,11 @@ pub trait Host {
     // An area that needs more of the server adds methods in ITS OWN region below, each with a safe default
     // body, then overrides it in ess_testkit's FakeHost region and in ess_glue's region (same area name).
     // ---- area tp ----
+    /// Whether the player is dead (on the death screen). The tp area polls it each tick to raise
+    /// `on_death` and, when the player comes back, `on_respawn`.
+    fn is_dead(&mut self, player: Uuid) -> bool {
+        false
+    }
     // ---- end tp ----
     // ---- area social ----
     // ---- end social ----
