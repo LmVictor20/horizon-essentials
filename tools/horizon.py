@@ -54,8 +54,14 @@ def stage(horizon, stages):
         process = subprocess.Popen(["git", "-C", str(horizon), "archive", "--format=tar", PIN], stdout=subprocess.PIPE)
         try:
             with tarfile.open(fileobj=process.stdout, mode="r|") as archive:
+                # tarfile's extraction filters arrived in Python 3.12 (and some 3.11 security releases);
+                # git archive of our own pinned checkout is trusted input either way.
+                safe = hasattr(tarfile, "data_filter")
                 for member in archive:
-                    archive.extract(member, temporary, filter="data")
+                    if safe:
+                        archive.extract(member, temporary, filter="data")
+                    else:
+                        archive.extract(member, temporary)
         finally:
             process.stdout.close()
             code = process.wait()

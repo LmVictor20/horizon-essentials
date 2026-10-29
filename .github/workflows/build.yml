@@ -1,0 +1,126 @@
+# Builds the Horizon dedicated server with horizon-essentials inside.
+#
+# It runs in Debian bookworm (glibc 2.36), the system Pterodactyl's `ghcr.io/parkervcp/yolks:debian` image runs,
+# so the binary starts there; a binary built on a newer system can refuse to start with "GLIBC_2.xx not found".
+#
+# Every push and pull request: unit tests, then the server build, uploaded as the `horizon-engine-essentials`
+# artifact. A `v*` tag also publishes it as a GitHub Release.
+# End-to-end tests need Minecraft's game files, which CI doesn't have: run `tools/e2e/run.py` locally.
+name: Build server
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release on tags
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    timeout-minutes: 120
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - name: System packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl git jq python3 build-essential pkg-config binutils
+          # The checkouts belong to another user than the container's root.
+          git config --global --add safe.directory '*'
+
+      - name: Rust (the version comes from rust-toolchain.toml)
+        run: |
+          curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v4
+        with:
+          path: horizon-essentials
+
+      - name: Pinned revisions
+        id: pins
+        working-directory: horizon-essentials
+        run: |
+          echo "horizon=$(jq -r .horizon_revision compatibility.json)" >> "$GITHUB_OUTPUT"
+          echo "mixins=$(jq -r .horizon_mixins_revision compatibility.json)" >> "$GITHUB_OUTPUT"
+
+      # tools/horizon.py finds these beside this repository.
+      - uses: actions/checkout@v4
+        with:
+          repository: horizon-rust/horizon
+          ref: ${{ steps.pins.outputs.horizon }}
+          path: horizon
+      - uses: actions/checkout@v4
+        with:
+          repository: horizon-rust/horizon-mixins
+          ref: ${{ steps.pins.outputs.mixins }}
+          path: horizon-mixins
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ~/.rustup/toolchains
+            horizon-mixins/target
+            horizon-essentials/target/horizon-cargo
+          key: server-${{ steps.pins.outputs.horizon }}-${{ hashFiles('horizon-essentials/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            server-${{ steps.pins.outputs.horizon }}-${{ hashFiles('horizon-essentials/Cargo.lock') }}-
+            server-${{ steps.pins.outputs.horizon }}-
+
+      - name: Unit tests
+        working-directory: horizon-essentials
+        run: cargo test --workspace --locked
+
+      - name: Stage the pinned Horizon with the mod applied
+        working-directory: horizon-essentials
+        run: |
+          cargo fetch --locked --manifest-path ../horizon-mixins/Cargo.toml
+          python3 tools/horizon.py stage
+          cargo fetch --locked --manifest-path target/mixins/modded/Cargo.toml
+
+      - name: Build the server
+        working-directory: horizon-essentials
+        run: python3 tools/horizon.py build
+
+      - name: Package
+        working-directory: horizon-essentials
+        run: |
+          mkdir -p dist
+          cp target/horizon-cargo/fast/horizon-client dist/horizon-engine-essentials
+          strip dist/horizon-engine-essentials
+          need=$(objdump -T dist/horizon-engine-essentials | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -Vu | tail -1)
+          echo "Highest glibc symbol: $need"
+          if [ "$(printf '%s\n2.36\n' "$need" | sort -V | tail -1)" != "2.36" ]; then
+            echo "::error::the binary needs glibc $need, newer than Debian bookworm's 2.36"
+            exit 1
+          fi
+          {
+            echo "horizon-essentials $(git rev-parse --short HEAD)"
+            echo "Horizon $(jq -r .horizon_nightly_tag compatibility.json) ($(jq -r .horizon_revision compatibility.json))"
+            echo "horizon-mixins $(jq -r .horizon_mixins_revision compatibility.json)"
+            echo "glibc >= $need (built on Debian bookworm)"
+          } > dist/BUILD-INFO.txt
+          (cd dist && sha256sum horizon-engine-essentials > SHA256SUMS)
+          cat dist/BUILD-INFO.txt dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-engine-essentials
+          path: horizon-essentials/dist/*
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: horizon-essentials/dist/*
+          generate_release_notes: true
