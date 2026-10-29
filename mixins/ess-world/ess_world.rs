@@ -2227,6 +2227,10 @@ fn on_tick(ess: &mut Ess, host: &mut dyn Host) {
         ess.state::<WorldState>().flight.insert(p, flight);
     }
     fire_projectiles(ess, host);
+    // One poll for every module's HTTP answers (ids carry the module's tag in their high bits).
+    for (id, status, body) in host.http_poll() {
+        let _ = crate::game::ess_geoip::on_http(ess, host, id, status, &body);
+    }
 }
 
 fn on_damage(ess: &mut Ess, host: &mut dyn Host, player: Uuid, cause: &str, _amount: f64) -> Allow {
