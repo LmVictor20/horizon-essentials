@@ -35,5 +35,6 @@ def test_vanilla_commands_still_work(t):
     alice = t.bot("Alice")
     t.console("op Alice")
     t.wait_log(r"Made Alice a server operator|Opped Alice")
-    alice.cmd("/time set day")
-    alice.expect(r"commands\.time\.set|Set the time")
+    # /seed: vanilla's own (Essentials overrides /time, /give, /tp... on purpose).
+    alice.cmd("/seed")
+    alice.expect(r"commands\.seed\.success|Seed")

@@ -14,14 +14,22 @@ def last_pos(bot):
 def test_jail_and_unjail(t):
     alice = t.bot("Alice")
     op(t, alice)
+    # First-time players are sent to spawn by the Spawn module (newbies.spawnpoint): settle, then move
+    # Alice somewhere distinct for the cell.
+    alice.expect(r"^Welcome Alice to the server!$")
+    time.sleep(0.5)
+    alice.cmd("/tppos 12.5 -60 12.5")
+    alice.expect_pos(12.5, -60, 12.5, within=1.0)
     cell = last_pos(alice)
     alice.cmd("/setjail cell")
     alice.expect(r"^Jail cell has been set\.$")
     alice.cmd("/jails")
     alice.expect(r"^Jails: cell$")
     bob = t.bot("Bob")
+    bob.expect(r"^Welcome Bob to the server!$")
+    time.sleep(0.5)
     start = last_pos(bob)
-    # Bob starts somewhere else than the cell (random spawn spread); he is sent there and back.
+    # Bob starts at spawn, away from the cell; he is sent there and back.
     alice.cmd("/jail Bob cell")
     alice.expect(r"^Player Bob jailed\.$")
     alice.expect(r"^Player Bob jailed by Alice\.$")

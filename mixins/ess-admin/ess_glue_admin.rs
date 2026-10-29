@@ -107,5 +107,4 @@ impl GameHost<'_, '_> {
         None
     }
 
-    /// Horizon's guests keep no Bukkit speeds: the vanilla defaults.
 }
