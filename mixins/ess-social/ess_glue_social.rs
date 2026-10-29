@@ -43,6 +43,23 @@ pub(super) fn on_tick(game: &mut super::Game<'_>) {
     let _ = with_ess(game, |ess, host| host.social_tick(ess));
 }
 
+/// A player's /say, /me or /msg (tell, w) that vanilla would run itself: queued for Essentials when it claims the
+/// label (through the core's command hook, as that player). True when claimed.
+pub(super) fn claim_message_command(game: &mut super::Game<'_>, player: Option<Uuid>, command: &str) -> bool {
+    let label = command.trim_start_matches('/').split(' ').next().unwrap_or("").to_lowercase();
+    if !matches!(label.as_str(), "say" | "me" | "msg" | "tell" | "w") || player.is_none() {
+        return false;
+    }
+    if with_ess(game, |ess, _| ess.claims(command)) != Some(true) {
+        return false;
+    }
+    let previous = std::mem::replace(&mut game.lan_acting_uuid, player);
+    let mut ran = false;
+    super::ess_glue::on_command(game, command, &mut ran);
+    game.lan_acting_uuid = previous;
+    ran
+}
+
 impl GameHost<'_, '_> {
     pub(super) fn social_broadcast(&mut self, text: &[Span]) {
         for p in self.online() {

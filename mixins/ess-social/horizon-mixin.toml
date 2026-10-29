@@ -84,6 +84,20 @@ bindings = [
   { name = "content", ty = "&Tag", value = "&content" },
 ]
 
+# /me, /msg, /tell, /w (and /say if claimed) from players go to Essentials, not vanilla's message commands.
+[[injection]]
+id = "guest-command"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::guest_command"
+helper = "hook_guest_command.rs"
+bindings = [
+  { name = "game", ty = "&mut Game<'_>", value = "&mut *self" },
+  { name = "host", ty = "&mut LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "command", ty = "&str", value = "command" },
+]
+
 # After the core's tick hook (same site, mod id order): held chat, command tree, join/quit flags.
 [[injection]]
 id = "tick"

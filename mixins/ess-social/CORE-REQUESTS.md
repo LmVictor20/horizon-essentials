@@ -21,3 +21,7 @@
    re-sent with `PlayerInfoUpdate` 0x20 whenever the player list changes). A macro-free seam (e.g. a small
    `fn display_override(&self, uuid) -> Option<Tag>` called from both) would let nicknames show in vanilla-signed
    chat and the join/leave lines too.
+6. **Vanilla runs /say, /me and /msg (tell, w) before `native_command`.** `Game::guest_command` calls
+   `guest_message_command` first, so Essentials' /me and /msg never reached the command hook. This area adds a
+   cancellable HEAD on `guest_command` (hook_guest_command.rs) that queues those labels for Essentials when it
+   claims them; the core may prefer to own this in its command hook.
