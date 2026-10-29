@@ -113,6 +113,8 @@ mod kit {
         pub unenchantable: Vec<(String, String)>,
         /// What `closed_containers` reports next (tests push here).
         pub closed: Vec<(Uuid, String, Vec<Option<Item>>)>,
+        /// Click policies set for open plugin containers: (player, tag) -> allowed per raw slot.
+        pub policies: HashMap<(Uuid, String), Vec<bool>>,
         // ---- end items ----
         // ---- area economy ----
         // ---- end economy ----
@@ -218,6 +220,7 @@ mod kit {
                 ]).as_array().cloned().unwrap_or_default(),
                 unenchantable: Vec::new(),
                 closed: Vec::new(),
+                policies: HashMap::new(),
                 // ---- end items ----
                 // ---- area economy ----
                 // ---- end economy ----
@@ -625,6 +628,20 @@ mod kit {
         }
         fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
             std::mem::take(&mut self.closed)
+        }
+        fn opened_containers(&mut self) -> Vec<(Uuid, String, usize)> {
+            let mut out = Vec::new();
+            for (uuid, p) in &self.players {
+                if let Some(c) = &p.open {
+                    if !self.policies.contains_key(&(*uuid, c.tag.clone())) {
+                        out.push((*uuid, c.tag.clone(), c.rows as usize * 9 + 36));
+                    }
+                }
+            }
+            out
+        }
+        fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {
+            self.policies.insert((player, tag.to_string()), allowed);
         }
         // ---- end items ----
         // ---- area economy ----

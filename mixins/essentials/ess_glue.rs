@@ -501,6 +501,12 @@ impl Host for GameHost<'_, '_> {
     fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
         self.items_closed_containers()
     }
+    fn opened_containers(&mut self) -> Vec<(Uuid, String, usize)> {
+        self.items_opened_containers()
+    }
+    fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {
+        self.items_set_container_policy(player, tag, allowed)
+    }
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----

@@ -263,37 +263,54 @@ pub fn component_plain(c: &Value) -> String {
 
 /// A text component back to `&` codes (FormatUtil.unformatString of a display name, for /createkit).
 fn component_legacy(c: &Value) -> String {
-    fn walk(c: &Value, out: &mut String) {
+    component_codes(c, '&')
+}
+
+/// A text component as a string with `§` codes: Horizon keeps custom names as plain strings, and vanilla
+/// clients still draw `§` codes inside literal text (how Bukkit's legacy display names look).
+pub fn component_section(c: &Value) -> String {
+    component_codes(c, '§')
+}
+
+fn component_codes(c: &Value, mark: char) -> String {
+    fn walk(c: &Value, out: &mut String, mark: char) {
         match c {
             Value::String(s) => out.push_str(s),
-            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out, mark)),
             Value::Object(o) => {
                 if let Some(raw) = o.get("raw") {
-                    return walk(raw, out);
+                    return walk(raw, out, mark);
                 }
                 let text = o.get("text").and_then(Value::as_str).unwrap_or("");
                 if let Some(color) = o.get("color").and_then(Value::as_str) {
                     if let Some(i) = ess_text::COLOR_NAMES.iter().position(|n| *n == color) {
-                        out.push('&');
+                        out.push(mark);
                         out.push("0123456789abcdef".as_bytes()[i] as char);
+                    } else if let Some(hex) = color.strip_prefix('#').filter(|h| h.len() == 6) {
+                        out.push(mark);
+                        out.push('x');
+                        for ch in hex.chars() {
+                            out.push(mark);
+                            out.push(ch);
+                        }
                     }
                 }
                 for (k, code) in [("obfuscated", 'k'), ("bold", 'l'), ("strikethrough", 'm'), ("underlined", 'n'), ("italic", 'o')] {
                     if o.get(k).and_then(Value::as_bool) == Some(true) {
-                        out.push('&');
+                        out.push(mark);
                         out.push(code);
                     }
                 }
                 out.push_str(text);
                 if let Some(Value::Array(extra)) = o.get("extra") {
-                    extra.iter().for_each(|x| walk(x, out));
+                    extra.iter().for_each(|x| walk(x, out, mark));
                 }
             }
             _ => {}
         }
     }
     let mut out = String::new();
-    walk(c, &mut out);
+    walk(c, &mut out, mark);
     out
 }
 
@@ -2605,13 +2622,20 @@ fn toggle_unlimited(ctx: &mut Ctx, me: Uuid, target: Uuid, name: &str) -> CmdRes
 /// onPlayerEggThrow, onPlayerBucketEmpty).
 pub fn on_use_item(ess: &mut Ess, host: &mut dyn Host, player: Uuid, on_block: bool) {
     let (slot, Some(item)) = held(host, player) else { return };
+    let survival = host.game_mode(player) == GameMode::Survival;
+    unlimited_use(ess, player, slot, item, survival, on_block);
+}
+
+/// `on_use_item` for a hook that knows the used slot (Bukkit numbering), its item and the game mode itself
+/// (packet hooks run while the hub is lent out: only Ess is at hand). The check runs next tick.
+pub fn unlimited_use(ess: &mut Ess, player: Uuid, slot: usize, item: Item, survival: bool, on_block: bool) {
     if !has_unlimited(ess, player, &item) {
         return;
     }
     let path = bare(&item.id).to_string();
     let bucket = path.ends_with("_bucket") && path != "milk_bucket";
     let egg = path == "egg";
-    if !(bucket || egg || (on_block && host.game_mode(player) == GameMode::Survival)) {
+    if !(bucket || egg || (on_block && survival)) {
         return;
     }
     ess.scheduler.later(
@@ -2745,7 +2769,13 @@ fn cmd_powertooltoggle(ctx: &mut Ctx, _args: &[String]) -> CmdResult {
 /// powertool commands run as the player next tick (`c:` lines are chat). True when one ran (the click is
 /// then cancelled).
 pub fn on_left_click(ess: &mut Ess, host: &mut dyn Host, player: Uuid) -> bool {
-    let Some(item) = held(host, player).1 else { return false };
+    let item = held(host, player).1;
+    powertool_click(ess, player, item.as_ref())
+}
+
+/// `on_left_click` with the held item given (packet hooks).
+pub fn powertool_click(ess: &mut Ess, player: Uuid, held: Option<&Item>) -> bool {
+    let Some(item) = held.filter(|i| bare(&i.id) != "air").cloned() else { return false };
     if !has_powertools(ess, player) || !powertools_enabled(ess, player) {
         return false;
     }
@@ -2791,12 +2821,19 @@ fn chat_as_player(ess: &mut Ess, host: &mut dyn Host, player: Uuid, text: &str) 
 /// A player hit another player (EssentialsEntityListener.onPlayerVsPlayerPowertool): the first powertool
 /// command with `{player}` runs with the defender's name. True cancels the hit.
 pub fn on_attack_player(ess: &mut Ess, host: &mut dyn Host, attacker: Uuid, defender: Uuid) -> bool {
+    let item = held(host, attacker).1;
+    let name = host.name(defender).unwrap_or_default();
+    powertool_attack(ess, attacker, item.as_ref(), &name)
+}
+
+/// `on_attack_player` with the held item and the defender's name given (packet hooks).
+pub fn powertool_attack(ess: &mut Ess, attacker: Uuid, held: Option<&Item>, defender: &str) -> bool {
     if !powertools_enabled(ess, attacker) {
         return false;
     }
-    let Some(item) = held(host, attacker).1 else { return false };
-    let name = host.name(defender).unwrap_or_default();
-    for tool in powertools_of(ess, attacker, &item) {
+    let Some(item) = held else { return false };
+    let name = defender.to_string();
+    for tool in powertools_of(ess, attacker, item) {
         let cmd = tool.replace("{player}", &name);
         if !cmd.is_empty() && cmd != tool {
             ess.scheduler.later(1, Box::new(move |ess, host| run_as_player(ess, host, attacker, &cmd)));
@@ -3502,8 +3539,13 @@ fn on_container_close(ess: &mut Ess, host: &mut dyn Host, player: Uuid, tag: &st
     }
 }
 
-/// Each tick: the plugin containers players closed reach the container_close listeners.
+/// Each tick: newly opened plugin containers get their click policy from the container_click listeners (every
+/// raw slot asked once), and the ones players closed reach the container_close listeners.
 fn poll_closed_containers(ess: &mut Ess, host: &mut dyn Host) {
+    for (player, tag, slots) in host.opened_containers() {
+        let allowed: Vec<bool> = (0..slots).map(|s| ess.on_container_click(host, player, &tag, s) == Allow::Yes).collect();
+        host.set_container_policy(player, &tag, allowed);
+    }
     for (player, tag, items) in host.closed_containers() {
         ess.on_container_close(host, player, &tag, &items);
     }
@@ -4127,6 +4169,12 @@ mod tests {
         t.cmd(bob, "/ec Alice");
         let tag = t.host.p(bob).open.clone().unwrap().tag;
         assert_eq!(t.ess.on_container_click(&mut t.host, bob, &tag, 0), Allow::No);
+        // The host gets every raw slot's answer once, on the tick after the open.
+        t.tick(1);
+        let policy = t.host.policies.get(&(bob, tag.clone())).cloned().unwrap();
+        assert_eq!(policy.len(), 27 + 36);
+        assert!(policy.iter().all(|a| !a));
+        assert!(t.host.policies.get(&(alice, open.tag.clone())).unwrap().iter().all(|a| *a));
         for (cmd, station) in [("/workbench", Station::Crafting), ("/anvil", Station::Anvil), ("/cartographytable", Station::Cartography), ("/grindstone", Station::Grindstone), ("/loom", Station::Loom), ("/smithingtable", Station::Smithing), ("/stonecutter", Station::Stonecutter)] {
             t.cmd(alice, cmd);
             assert_eq!(t.host.p(alice).station, Some(station), "{cmd}");

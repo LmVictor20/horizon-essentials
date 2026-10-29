@@ -27,4 +27,70 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_items"
 source = "ess_glue_items.rs"
 
-# This area's injections go below ([[injection]] entries with helpers in this folder).
+# Network: the item components Horizon keeps but doesn't send (lore, head profile, unbreakable, model data).
+[[module]]
+id = "items-net"
+file = "crates/horizon-client/src/lan/hub.rs"
+name = "ess_items_net"
+source = "ess_items_net.rs"
+
+# This area's injections ([[injection]] entries with helpers in this folder).
+[[injection]]
+id = "net-stack"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::lan::hub::Hub::stack"
+helper = "hook_net.rs"
+bindings = [
+  { name = "hub", ty = "&mut crate::lan::hub::Hub", value = "&mut *self" },
+  { name = "s", ty = "&Option<crate::items::ItemStack>", value = "s" },
+]
+
+# Players' packets: plugin container clicks (their policy), powertools (left clicks, attacks), unlimited items.
+[[injection]]
+id = "packet"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::lan_guest_packet"
+helper = "hook_packet.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "packet", ty = "&horizon_protocol::packets::play::Serverbound", value = "&packet" },
+]
+
+# Plugin containers live under stand-in chest keys at VEHICLE_KEY_Y: they stay valid.
+[[injection]]
+id = "vehicle-valid"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::chest_vehicle_still_valid"
+helper = "hook_vehicle.rs"
+bindings = [{ name = "id", ty = "i32", value = "id" }]
+
+# /workbench: a crafting table at VEHICLE_KEY_Y is valid.
+[[injection]]
+id = "table-valid"
+kind = "RETURN"
+target = "horizon_client::game::lan_crafting::Game<'_>::lan_table_valid"
+helper = "hook_table.rs"
+bindings = [
+  { name = "value", ty = "bool", value = "$value" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+]
+
+# /anvil, /loom...: hidden from the stations' block checks, back right after.
+[[injection]]
+id = "stations-hide"
+kind = "HEAD"
+target = "horizon_client::game::lan_stations::Game<'_>::lan_stations_tick"
+helper = "hook_stations.rs"
+bindings = [{ name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" }]
+
+[[injection]]
+id = "stations-restore"
+kind = "HEAD"
+target = "horizon_client::game::lan_crafting::Game<'_>::lan_tables_tick"
+helper = "hook_tables.rs"
+bindings = [{ name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" }]

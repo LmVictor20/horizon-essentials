@@ -459,6 +459,14 @@ pub trait Host {
     fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
         Vec::new()
     }
+    /// Plugin containers opened since the last call that still need a click policy: (player, tag, raw slots).
+    /// Clicks arrive while Essentials can't be asked, so the items area asks the container_click listeners
+    /// for every raw slot once, right after the open, and hands the answers back with `set_container_policy`.
+    fn opened_containers(&mut self) -> Vec<(Uuid, String, usize)> {
+        Vec::new()
+    }
+    /// Which raw slots of a player's open plugin container may be clicked (container_click's answers).
+    fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {}
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----
