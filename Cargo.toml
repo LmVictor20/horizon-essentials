@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/ess-standalone"]
+# Built against the pinned Horizon export by tools/horizon.py's stage (its own workspace).
+exclude = ["tools/ess-bot"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "GPL-3.0-only"
+rust-version = "1.95"

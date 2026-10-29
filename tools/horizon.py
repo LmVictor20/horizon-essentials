@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Export pinned sources, apply the template bundle and build a native Horizon."""
+"""Export pinned sources, apply horizon-essentials and build or test the Horizon server.
+
+Adapted from horizon-native-mod-template's tools/horizon.py (MIT). Shared checkouts default to the
+folder that holds this repository's main checkout (~/Projects/horizon-mods), so every git worktree
+of the repository finds the same `horizon` and `horizon-mixins` clones."""
 import argparse
 import contextlib
 import fcntl
@@ -17,7 +21,12 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 COMPAT = json.loads((ROOT / "compatibility.json").read_text())
 PIN = COMPAT["horizon_revision"]
-MIXINS = Path(os.environ.get("HORIZON_MIXINS", ROOT.parent / "horizon-mixins")).resolve()
+# The main checkout's parent, also from a linked worktree (.worktrees/<name>).
+SHARED = Path(subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute",
+                                       "--git-common-dir"], text=True).strip()).parent.parent
+MIXINS = Path(os.environ.get("HORIZON_MIXINS", SHARED / "horizon-mixins")).resolve()
+# Every injected module is `crate::game::ess_*`: one filter runs all of their unit tests in the game.
+TEST_FILTER = "game::ess_"
 
 
 def digest(data):
@@ -81,6 +90,12 @@ def mixin_stage(horizon, stages):
         raise ValueError(f"horizon-mixins must be pinned at {COMPAT['horizon_mixins_revision']}, got {revision}")
     subprocess.run(["git", "-C", str(MIXINS), "diff", "--quiet", "HEAD", "--", "Cargo.toml", "Cargo.lock", "crates"], check=True)
     original, _ = stage(horizon, stages / "original")
+    # A stable path to the unmodified pinned export, for tools that build against Horizon's crates (ess-bot).
+    pinned = stages / "pinned"
+    if pinned.is_symlink() and pinned.resolve() != original.resolve():
+        pinned.unlink()
+    if not pinned.exists():
+        pinned.symlink_to(original.relative_to(stages))
     subprocess.run(["cargo", "build", "--locked", "--offline", "--target-dir", str(MIXINS / "target"), "-p", "horizon-mixins-cli"], cwd=MIXINS, check=True, stdout=sys.stderr)
     cli = MIXINS / "target/debug/horizon-mixins"
     output = stages / "modded"
@@ -103,7 +118,7 @@ def lock(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["stage", "check", "build", "test"])
-    parser.add_argument("--horizon", type=Path, default=ROOT.parent / "horizon")
+    parser.add_argument("--horizon", type=Path, default=SHARED / "horizon")
     parser.add_argument("--target-dir", type=Path, default=ROOT / "target/horizon-cargo")
     args = parser.parse_args()
     horizon = args.horizon.resolve()
@@ -123,7 +138,7 @@ def main():
             if args.action == "build":
                 command.extend(["--profile", "fast"])
             if args.action == "test":
-                command.extend(["game::example_mod::tests", "--", "--nocapture"])
+                command.extend([TEST_FILTER, "--", "--nocapture"])
             with lock(target.parent / (target.name + ".mod-template.lock")):
                 run_start = time.monotonic()
                 result = subprocess.run(command, cwd=output, capture_output=True, text=True)

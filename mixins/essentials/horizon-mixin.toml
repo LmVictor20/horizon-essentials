@@ -1,0 +1,33 @@
+[mod]
+id = "horizon-essentials"
+version = "0.1.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "9669600c389ad6d205db4ec0bb061935f2a38d0c"
+
+# Pure logic: no Horizon types. Also compiled standalone by crates/ess-standalone.
+[[module]]
+id = "core"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_core"
+source = "ess_core.rs"
+
+# Game-only glue: reads and drives the server through Game/Hub.
+[[module]]
+id = "glue"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_glue"
+source = "ess_glue.rs"
+
+# Every command a player (or the console) types reaches this before vanilla's dispatcher.
+[[injection]]
+id = "command"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_command"
+helper = "hook_command.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "command", ty = "&str", value = "command" },
+  { name = "ran", ty = "&mut bool", value = "&mut *ran" },
+]

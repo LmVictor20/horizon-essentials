@@ -1,0 +1,16 @@
+[package]
+name = "ess-bot"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-only"
+publish = false
+description = "A scripted vanilla-protocol player for horizon-essentials' end-to-end tests (L3)"
+
+# Its own workspace: it builds against the pinned Horizon export that tools/horizon.py stage links at
+# target/mixins/pinned, never against the game crate or the mod workspace.
+[workspace]
+
+[dependencies]
+horizon-protocol = { path = "../../target/mixins/pinned/crates/horizon-protocol" }
+horizon-world = { path = "../../target/mixins/pinned/crates/horizon-world" }
+serde_json = "1"
