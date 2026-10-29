@@ -749,6 +749,7 @@ mod kit {
     fn scheduler_tasks_run_on_ticks() {
         let mut t = TestServer::new();
         let alice = t.join("Alice");
+        t.said(alice); // the join's own lines (motd, mail notice)
         t.ess.scheduler.later(3, Box::new(move |ess, host| ess.send_mini(host, Sender::Player(alice), "later")));
         t.tick(2);
         assert!(t.said(alice).is_empty());
