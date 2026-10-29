@@ -117,48 +117,48 @@ Area-wide notes (tp): messages name players by their account name (nicknames and
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /backup | core |  | todo | |
-| /ban | core |  | todo | |
-| /banip | core |  | todo | |
-| /compass | core | direction | todo | |
-| /deljail | core | remjail, rmjail | todo | |
-| /depth | core | height | todo | |
-| /essentials | core | ess, essversion | todo | |
-| /gc | core | lag, mem, memory, uptime, tps, entities | todo | |
-| /getpos | core | coords, position, whereami, getlocation, getloc | todo | |
-| /invsee | core |  | todo | |
-| /jailedplayers | core | ejailed, ejp | todo | |
-| /jails | core |  | todo | |
-| /kick | core |  | todo | |
-| /kickall | core |  | todo | |
-| /kill | core |  | todo | |
-| /list | core | online, playerlist, plist, who | todo | |
-| /near | core | nearby | todo | |
-| /playtime | core |  | todo | |
-| /seen | core | alts | todo | |
-| /setjail | core | createjail | todo | |
-| /sudo | core |  | todo | |
-| /tempban | core |  | todo | |
-| /tempbanip | core |  | todo | |
-| /togglejail | core | jail, tjail, unjail | todo | |
-| /unban | core | pardon | todo | |
-| /unbanip | core | pardonip | todo | |
-| /vanish | core | v | todo | |
-| /whois | core |  | todo | |
+| /backup | core |  | done | save-all/save-off, the configured `backup.command` in the background, then save-on and "Backup finished."; periodic `backup.interval` and `always-run` |
+| /ban | core |  | done | written to banned-players.json; offline/exempt nodes, `ban.notify`; L3 admin_bans |
+| /banip | core |  | done | by address or player's last IP; kicks online players on that IP; L3 admin_bans |
+| /compass | core | direction | done | |
+| /deljail | core | remjail, rmjail | done | |
+| /depth | core | height | done | sea level 63 (nether 32, end 0) |
+| /essentials | core | ess, essversion | partial | reload (config, permissions, messages, jail.yml), version, commands, debug, cleanup, homes fix/delete, usermap, moo, nyan (note blocks via /playsound). No `dump`, `itemtest` or `reset`: they report Bukkit/plugin internals |
+| /gc | core | lag, mem, memory, uptime, tps, entities | done | TPS from the server clock's average tick time (20 when ticks take under 50 ms); memory is the process RSS against the machine's RAM, since there is no JVM heap; per-dimension chunks, mobs and block entities |
+| /getpos | core | coords, position, whereami, getlocation, getloc | done | Bukkit world names (`world`, `world_nether`, `world_the_end`); L3 admin_info |
+| /invsee | core |  | partial | opens a 5-row copy of the inventory (or the 1-row `equip` view); `invsee.modify` / `invsee.preventmodify` decide whether clicks are allowed, and edits are written back when it closes. The view doesn't update live, and the container glue (Host::open_container) belongs to the items area |
+| /jailedplayers | core | ejailed, ejp | done | every jailed user, online or not; L3 admin_jail |
+| /jails | core |  | done | L3 admin_jail |
+| /kick | core |  | done | `kick.exempt`, `kick.notify`, hidden targets; L3 admin_bans |
+| /kickall | core |  | done | spares the sender and `kickall.exempt` |
+| /kill | core |  | done | `kill.exempt` / `kill.force`, cancelled damage, `*`; sets health through the world area's glue |
+| /list | core | online, playerlist, plist, who | done | guests' `/list` is rerouted from Horizon's built-in answer (guest_command HEAD hook); groups from permissions.yml, `list:` merge/hidden/limit/`*`, `[HIDDEN]`/`[AFK]` tags; L3 admin_info |
+| /near | core | nearby | done | |
+| /playtime | core |  | done | `minecraft:play_time` from live counters, or the stats file for offline players |
+| /seen | core | alts | partial | online/offline, bans and expiry, IP, logout location, whitelist, UUID, alts and IP search (L3 admin_info). "First login" is omitted (Horizon keeps no first-join time); no GeoIP |
+| /setjail | core | createjail | done | jail.yml as EssentialsX writes it (world as a dimension id, plus `world-name`); L3 admin_jail |
+| /sudo | core |  | done | Essentials or vanilla commands next tick; `c:` chat goes through the chat listeners |
+| /tempban | core |  | done | DateUtil durations, `max-tempban-time`, `tempban.unlimited/offline/exempt`; L3 admin_bans |
+| /tempbanip | core |  | done | keeps EssentialsX's argument order (reason shown as {2}) |
+| /togglejail | core | jail, tjail, unjail | done | teleport to jail, timed sentences, extensions, `jail.exempt`, offline jailing applied on join; L3 admin_jail |
+| /unban | core | pardon | done | L3 admin_bans |
+| /unbanip | core | pardonip | done | L3 admin_bans |
+| /vanish | core | v | partial | hidden from /list, tab completion, player matching, /near and the tab list (unlisted for players without `vanish.see`); `vanish.effect` gives invisibility. The player entity stays tracked for everyone: Horizon's entity tracking is shared by all viewers. L3 admin_info |
+| /whois | core |  | partial | every EssentialsX line. Speed is always the default 0.2/0.1, because Horizon keeps no Bukkit speeds; AFK "since" needs the social area's timestamp; no GeoIP |
 
 **Features (admin)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| permissions provider: permissions.yml groups, inheritance, wildcards, negation, prefix/suffix | todo | |
-| ban/tempban/ipban enforced at login | todo | |
-| jail: restrictions (break/place/interact/commands), jail-online-time, teleport-when-freed | todo | |
-| vanish: tab list, entity, /list, status sample | todo | |
-| invsee: live view and edits | todo | |
-| disabled-commands, overridden-commands, command-cooldowns (+persistence) | todo | |
-| log-console-commands | todo | |
-| kickall/kick exempt nodes, ban notify | todo | |
-| seen: alts by IP, IP search | todo | |
+| permissions provider: permissions.yml groups, inheritance, wildcards, negation, prefix/suffix | partial | tested in ess_admin (groups, default group, inheritance chains and loops, `a.*`/`*`, `-node`, users by name or UUID, plugin.yml op defaults, reload). Plugin.yml children of configured parent nodes are not expanded, and a group's `-node` beats a user's `node`: CORE-REQUESTS 1-2 |
+| ban/tempban/ipban enforced at login | partial | bans go to the vanilla lists, so vanilla's login check refuses banned players (L3 admin_bans). The refusal text is vanilla's: `Lists::can_login` contains `vec!` macros that horizon-mixins can't hook. Players who still get in (integrated server) are kicked on join with banJoin/tempbanJoin/banIpJoin/tempbanIpJoin; expired tempbans are removed |
+| jail: restrictions (break/place/interact/commands), jail-online-time, teleport-when-freed | partial | break, place, interact, Essentials commands (`jail.allow.<cmd>`), respawn in jail, sent back on join, timeouts checked every second, `jail-online-time` (play_time), `teleport-when-freed` back/spawn/off. Not covered: teleports out, hitting players, game-mode changes and vanilla commands, because the core has no such events (CORE-REQUESTS 3, 5) |
+| vanish: tab list, entity, /list, status sample | partial | tab list, /list, `can_see`, re-hidden for players who join later, unvanished on quit, `silentjoin.vanish`. Entity hiding is global only (invisibility effect), and the status sample is not filtered |
+| invsee: live view and edits | partial | see /invsee: a snapshot, edited on close |
+| disabled-commands, overridden-commands, command-cooldowns (+persistence) | partial | disabled-commands (left to vanilla) and cooldowns (`*` wildcards, `^regex`, bypass nodes, persisted in userdata `timestamps.command-cooldowns` or kept in memory) apply to Essentials commands only (CORE-REQUESTS 3). overridden-commands has nothing to yield to: Horizon has no other plugins |
+| log-console-commands | done | "CONSOLE issued server command: /..." in the server log |
+| kickall/kick exempt nodes, ban notify | done | kick/kickall/ban/tempban/sudo/kill/jail exempt nodes; ban/banip/kick/jail notify |
+| seen: alts by IP, IP search | done | /alts and `/seen <ip>` with `seen.ipsearch` |
 
 ## items (36 commands)
 

@@ -107,6 +107,12 @@ mod kit {
         // ---- area social ----
         // ---- end social ----
         // ---- area admin ----
+        /// Players on the whitelist.
+        pub whitelist: Vec<Uuid>,
+        /// First join times (Unix millis).
+        pub first_played: HashMap<Uuid, i64>,
+        /// Server log lines (Host::log), plain.
+        pub logs: Vec<String>,
         // ---- end admin ----
         // ---- area items ----
         // ---- end items ----
@@ -198,6 +204,9 @@ mod kit {
                 // ---- area social ----
                 // ---- end social ----
                 // ---- area admin ----
+                whitelist: Vec::new(),
+                first_played: HashMap::new(),
+                logs: Vec::new(),
                 // ---- end admin ----
                 // ---- area items ----
                 // ---- end items ----
@@ -600,6 +609,18 @@ mod kit {
         // ---- area social ----
         // ---- end social ----
         // ---- area admin ----
+        fn whitelisted(&mut self, player: Uuid) -> bool {
+            self.whitelist.contains(&player)
+        }
+        fn first_played(&mut self, player: Uuid) -> Option<i64> {
+            self.first_played.get(&player).copied()
+        }
+        fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+            self.players.get(&player).map_or((0.1, 0.2), |p| (p.fly_speed, p.walk_speed))
+        }
+        fn log(&mut self, text: &[Span]) {
+            self.logs.push(plain(text));
+        }
         // ---- end admin ----
         // ---- area items ----
         // ---- end items ----

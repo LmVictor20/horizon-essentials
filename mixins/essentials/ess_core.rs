@@ -449,6 +449,22 @@ pub trait Host {
     // ---- area social ----
     // ---- end social ----
     // ---- area admin ----
+    /// Whether the player is on the server's whitelist (/whois, /seen).
+    fn whitelisted(&mut self, player: Uuid) -> bool {
+        false
+    }
+    /// When the player first joined this server (Unix millis), if known (/seen first login).
+    fn first_played(&mut self, player: Uuid) -> Option<i64> {
+        None
+    }
+    /// The player's Bukkit (fly, walk) speeds, for /whois.
+    fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+        (0.1, 0.2)
+    }
+    /// A line for the server log (EssentialsX's LOGGER.info: bans, kicks, jails, console commands).
+    fn log(&mut self, text: &[Span]) {
+        self.send(Sender::Console, text);
+    }
     // ---- end admin ----
     // ---- area items ----
     // ---- end items ----
