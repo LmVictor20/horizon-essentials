@@ -73,7 +73,7 @@ users:
     groups: [admin]
     permissions: [essentials.fly, -essentials.home.others]   # extra nodes; `-` denies
 ```
-Node names are EssentialsX's ([command reference](https://essentialsx.net/wiki/Command-Reference.html)).
+Node names are EssentialsX's: [permissions](https://essentialsx.net/permissions), [commands](https://essentialsx.net/commands).
 
 **Coming from EssentialsX on Paper/Spigot:** copy the contents of `plugins/Essentials/` into `essentials/`
 (config, userdata, warps, kits, worth, spawn and jails keep their formats). Bukkit world names (`world`,

@@ -1499,7 +1499,7 @@ pub fn properties(text: &str) -> BTreeMap<String, String> {
 /// regular player may use), `admin` everything. Ops get every op-default node anyway.
 pub const DEFAULT_PERMISSIONS: &str = "\
 # horizon-essentials permissions (EssentialsX expects a permissions plugin; this file is that plugin).
-# Nodes are EssentialsX's (https://essentialsx.net/wiki/Command-Reference.html). `-node` denies; `a.*` grants a
+# Nodes are EssentialsX's (https://essentialsx.net/permissions). `-node` denies; `a.*` grants a
 # whole branch. Players without a group are in the group marked `default: true`. Operators also get every node
 # whose plugin.yml default is `op`. Reload with /essentials reload.
 groups:
