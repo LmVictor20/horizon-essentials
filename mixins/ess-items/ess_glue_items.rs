@@ -19,7 +19,7 @@ use crate::game::ess_core::*;
 use horizon_client::containers::BlockEntity;
 use horizon_client::items::ItemStack;
 use horizon_client::lan::menu::{Slots, VEHICLE_KEY_Y};
-use horizon_protocol::packets::play::{self, Clientbound as C, Serverbound as S};
+use horizon_protocol::packets::play::{self, Clientbound as C};
 use serde_json::{Map, Value, json};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -47,18 +47,11 @@ struct Portable {
     window: i32,
 }
 
-#[derive(Default)]
-struct Digging {
-    active: bool,
-    last_action: Option<std::time::Instant>,
-}
-
 thread_local! {
     static VIRTUALS: RefCell<Vec<Virtual>> = const { RefCell::new(Vec::new()) };
     static NEXT_KEY: RefCell<i32> = const { RefCell::new(0) };
     static PORTABLE: RefCell<HashMap<u32, Portable>> = RefCell::new(HashMap::new());
     static STASHED: RefCell<Vec<(u32, super::lan_stations::GuestStation)>> = const { RefCell::new(Vec::new()) };
-    static DIGGING: RefCell<HashMap<u32, Digging>> = RefCell::new(HashMap::new());
 }
 
 fn ns(id: &str) -> String {
@@ -462,90 +455,84 @@ pub(super) fn restore_portable_stations(host: &mut super::lan::LanHost) {
     }
 }
 
-/// `lan_guest_packet` (HEAD, cancellable): clicks in plugin containers (their policy), powertools (left clicks
-/// and attacks) and unlimited items (placing, throwing, emptying). Break cancels the packet.
-pub(super) fn on_packet(game: &mut super::Game<'_>, host: &mut super::lan::LanHost, conn: u32, packet: &S) -> std::ops::ControlFlow<()> {
+/// `lan_merchant_click` (HEAD, cancellable): the first check every container click goes through. A click in
+/// one of our plugin containers that its policy refuses is answered here (Break(true): handled, nothing moves).
+pub(super) fn on_click(game: &mut super::Game<'_>, host: &mut super::lan::LanHost, conn: u32, p: &play::ContainerClick) -> std::ops::ControlFlow<bool> {
+    use std::ops::ControlFlow::{Break, Continue};
+    let Some(gi) = host.hub.guests.iter().position(|g| g.conn == conn) else { return Continue(()) };
+    let menu = host.hub.guests[gi].menu.as_ref().filter(|m| m.window == p.container).map(|m| m.pos);
+    let Some(Some(pos)) = menu else { return Continue(()) };
+    let allowed = VIRTUALS.with_borrow(|all| {
+        all.iter().find(|v| v.conn == conn && v.key == pos && v.window == p.container).map(|v| match (&v.policy, usize::try_from(p.slot)) {
+            (None, _) => false,
+            (Some(_), Err(_)) => true,
+            (Some(policy), Ok(slot)) => policy.get(slot).copied().unwrap_or(true) && (p.input != 1 || policy.iter().all(|a| *a)),
+        })
+    });
+    if allowed == Some(false) {
+        resend_container(game, host, gi);
+        return Break(true);
+    }
+    Continue(())
+}
+
+fn recent(uuid: Uuid) -> bool {
+    LAST_ACTION.with_borrow(|d| d.get(&uuid).is_some_and(|t| t.elapsed().as_millis() < 150))
+}
+fn mark(uuid: Uuid) {
+    LAST_ACTION.with_borrow_mut(|d| d.insert(uuid, std::time::Instant::now()));
+}
+
+/// `guest_attack` (HEAD, cancellable): a player hitting another player with a `{player}` powertool runs it
+/// instead of the hit.
+pub(super) fn on_attack(game: &mut super::Game<'_>, host: &mut super::lan::LanHost, conn: u32, id: i32) -> std::ops::ControlFlow<()> {
     use std::ops::ControlFlow::{Break, Continue};
     let Some(gi) = host.hub.guests.iter().position(|g| g.conn == conn) else { return Continue(()) };
     let uuid = host.hub.guests[gi].uuid;
-    match packet {
-        S::ContainerClick(p) => {
-            let menu = host.hub.guests[gi].menu.as_ref().filter(|m| m.window == p.container).map(|m| m.pos);
-            let Some(Some(pos)) = menu else { return Continue(()) };
-            let allowed = VIRTUALS.with_borrow(|all| {
-                all.iter().find(|v| v.conn == conn && v.key == pos && v.window == p.container).map(|v| match (&v.policy, usize::try_from(p.slot)) {
-                    (None, _) => false,
-                    (Some(_), Err(_)) => true,
-                    (Some(policy), Ok(slot)) => policy.get(slot).copied().unwrap_or(true) && (p.input != 1 || policy.iter().all(|a| *a)),
-                })
-            });
-            if allowed == Some(false) {
-                resend_container(game, host, gi);
-                return Break(());
-            }
-            Continue(())
-        }
-        S::PlayerAction(a) if a.action == 0 => {
-            DIGGING.with_borrow_mut(|d| {
-                let e = d.entry(conn).or_default();
-                e.active = true;
-                e.last_action = Some(std::time::Instant::now());
-            });
-            if powertool_click(game, host, gi, uuid) {
-                host.hub.ack(conn, a.sequence);
-                DIGGING.with_borrow_mut(|d| d.entry(conn).or_default().active = false);
-                return Break(());
-            }
-            Continue(())
-        }
-        S::PlayerAction(a) if a.action == 1 || a.action == 2 => {
-            DIGGING.with_borrow_mut(|d| d.entry(conn).or_default().active = false);
-            Continue(())
-        }
-        S::Punch(_) => {
-            let skip = DIGGING.with_borrow(|d| d.get(&conn).is_some_and(|e| e.active || e.last_action.is_some_and(|t| t.elapsed().as_millis() < 100)));
-            if !skip {
-                powertool_click(game, host, gi, uuid);
-            }
-            Continue(())
-        }
-        S::Attack(p) => {
-            DIGGING.with_borrow_mut(|d| d.entry(conn).or_default().last_action = Some(std::time::Instant::now()));
-            let Some(defender) = host.hub.guests.iter().find(|g| g.entity_id == p.id && g.placed).map(|g| g.name.clone()) else { return Continue(()) };
-            let held = held_item(host, gi);
-            let used = super::ess_glue::with_ess(game, |ess, _| crate::game::ess_items::powertool_attack(ess, uuid, held.as_ref(), &defender)).unwrap_or(false);
-            if used { Break(()) } else { Continue(()) }
-        }
-        S::UseItemOn(p) => {
-            DIGGING.with_borrow_mut(|d| d.entry(conn).or_default().last_action = Some(std::time::Instant::now()));
-            unlimited(game, host, gi, uuid, p.hand, true);
-            Continue(())
-        }
-        S::UseItem(p) => {
-            DIGGING.with_borrow_mut(|d| d.entry(conn).or_default().last_action = Some(std::time::Instant::now()));
-            unlimited(game, host, gi, uuid, p.hand, false);
-            Continue(())
-        }
-        _ => Continue(()),
+    mark(uuid);
+    let Some(defender) = host.hub.guests.iter().find(|g| g.entity_id == id && g.placed).map(|g| g.name.clone()) else { return Continue(()) };
+    let g = &host.hub.guests[gi];
+    let held = g.inventory.get(g.selected).and_then(opt_item);
+    let used = super::ess_glue::with_ess(game, |ess, _| crate::game::ess_items::powertool_attack(ess, uuid, held.as_ref(), &defender)).unwrap_or(false);
+    if used { Break(()) } else { Continue(()) }
+}
+
+/// `reset_attack_strength` (HEAD): a guest's punch (a left click in the air or starting to dig; not an attack,
+/// not a dig going on) fires their powertool next tick, when the hub is back to read the held item.
+pub(super) fn on_punch(game: &mut super::Game<'_>) {
+    let Some(uuid) = game.lan_acting_uuid else { return };
+    if game.mining.as_ref().is_some_and(|m| m.ticks > 0) || recent(uuid) {
+        return;
+    }
+    mark(uuid);
+    super::ess_glue::with_ess(game, |ess, _| {
+        ess.scheduler.later(
+            1,
+            Box::new(move |ess, host| {
+                crate::game::ess_items::on_left_click(ess, host, uuid);
+            }),
+        );
+    });
+}
+
+thread_local! {
+    static USES: RefCell<Vec<(Uuid, usize, Item, bool, bool)>> = const { RefCell::new(Vec::new()) };
+    static LAST_ACTION: RefCell<HashMap<Uuid, std::time::Instant>> = RefCell::new(HashMap::new());
+}
+
+/// `under_spawn_protection` (HEAD): runs before a guest uses their held item on a block (and before a dig):
+/// the held stack as it was, for unlimited items (checked next tick by the items area).
+pub(super) fn before_use(host: &super::lan::LanHost, gi: usize) {
+    let Some(g) = host.hub.guests.get(gi) else { return };
+    if let Some(item) = g.inventory.get(g.selected).and_then(opt_item) {
+        USES.with_borrow_mut(|u| u.push((g.uuid, g.selected, item, g.game_mode == 0, true)));
     }
 }
 
-fn held_item(host: &super::lan::LanHost, gi: usize) -> Option<Item> {
-    let g = &host.hub.guests[gi];
-    g.inventory.get(g.selected).and_then(opt_item)
-}
-
-fn powertool_click(game: &mut super::Game<'_>, host: &super::lan::LanHost, gi: usize, uuid: Uuid) -> bool {
-    let held = held_item(host, gi);
-    held.is_some() && super::ess_glue::with_ess(game, |ess, _| crate::game::ess_items::powertool_click(ess, uuid, held.as_ref())).unwrap_or(false)
-}
-
-fn unlimited(game: &mut super::Game<'_>, host: &super::lan::LanHost, gi: usize, uuid: Uuid, hand: i32, on_block: bool) {
-    let g = &host.hub.guests[gi];
-    let (slot, item) = if hand == 1 { (40, opt_item(&g.offhand)) } else { (g.selected, g.inventory.get(g.selected).and_then(opt_item)) };
-    let Some(item) = item else { return };
-    let survival = g.game_mode == 0;
-    super::ess_glue::with_ess(game, |ess, _| crate::game::ess_items::unlimited_use(ess, uuid, slot, item, survival, on_block));
+impl GameHost<'_, '_> {
+    pub(super) fn items_item_uses(&mut self) -> Vec<(Uuid, usize, Item, bool, bool)> {
+        USES.with_borrow_mut(std::mem::take)
+    }
 }
 
 /// A refused click: the client gets the container and its carried stack back as the server has them.

@@ -3549,6 +3549,9 @@ fn poll_closed_containers(ess: &mut Ess, host: &mut dyn Host) {
     for (player, tag, items) in host.closed_containers() {
         ess.on_container_close(host, player, &tag, &items);
     }
+    for (player, slot, item, survival, on_block) in host.item_uses() {
+        unlimited_use(ess, player, slot, item, survival, on_block);
+    }
 }
 
 fn station(ctx: &mut Ctx, station: Station, unsupported: bool) -> CmdResult {
@@ -3807,8 +3810,9 @@ mod tests {
     fn kit_meta_commands_and_others() {
         let (mut t, alice) = server("");
         let bob = t.join("Bob");
-        assert_eq!(t.cmd(alice, "/kit dtools Bob"), ["Giving kit dtools to Bob."]);
-        assert_eq!(t.said(bob), ["Received kit dtools."]);
+        // The kit's "/broadcast {USERNAME} ..." line runs as the console (Essentials' own /broadcast here).
+        assert_eq!(t.cmd(alice, "/kit dtools Bob"), ["[Broadcast] Bob just got some fancy tools!", "Giving kit dtools to Bob."]);
+        assert_eq!(t.said(bob).last().unwrap(), "Received kit dtools.");
         let inv = t.host.p(bob).inventory.clone();
         let pick = inv.iter().flatten().find(|i| i.id == "minecraft:diamond_pickaxe").unwrap();
         assert_eq!(pick.components["enchantments"], json!({"minecraft:efficiency": 1, "minecraft:unbreaking": 1, "minecraft:fortune": 1}));
@@ -3817,7 +3821,7 @@ mod tests {
         assert_eq!(helm.components["dyed_color"], json!(0xFFFFFF));
         let axe = inv.iter().flatten().find(|i| i.id == "minecraft:diamond_axe").unwrap();
         assert_eq!(axe.components["damage"], json!(780));
-        assert_eq!(t.host.console_commands, ["broadcast Bob just got some fancy tools!"]);
+        assert!(t.host.console_commands.is_empty());
         // The console gives kits to a player too.
         assert_eq!(t.console("/kit notch Bob"), ["Giving kit notch to Bob."]);
         let head = t.host.p(bob).inventory.iter().flatten().find(|i| i.id == "minecraft:player_head").cloned().unwrap();
@@ -4202,6 +4206,7 @@ mod tests {
         t.tick(2);
         assert_eq!(t.host.p(alice).inventory[0], Some(it("stone", 1)));
         let bob = t.join("Bob");
+        t.said(bob);
         assert_eq!(t.cmd(alice, "/unlimited dirt Bob"), ["Giving unlimited amount of dirt to Bob."]);
         assert_eq!(t.said(bob), ["Giving unlimited amount of dirt to Bob."]);
         assert_eq!(t.cmd(alice, "/unlimited clear Bob"), ["Disabled unlimited placing of dirt for Bob."]);
@@ -4222,7 +4227,8 @@ mod tests {
         assert!(on_left_click(&mut t.ess, &mut t.host, alice));
         t.tick(1);
         let ran: Vec<String> = t.host.player_commands.iter().map(|(_, c, _)| c.clone()).collect();
-        assert_eq!(ran, ["say hi", "me waves"]);
+        // /me is Essentials' own (dispatched as the player), /say vanilla's.
+        assert_eq!(ran, ["say hi"]);
         assert_eq!(t.cmd(alice, "/pt r:say hi"), ["Command say hi removed from stick."]);
         assert_eq!(t.cmd(alice, "/ptt"), ["All of your power tools have been disabled."]);
         assert!(!on_left_click(&mut t.ess, &mut t.host, alice));

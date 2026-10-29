@@ -507,6 +507,9 @@ impl Host for GameHost<'_, '_> {
     fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {
         self.items_set_container_policy(player, tag, allowed)
     }
+    fn item_uses(&mut self) -> Vec<(Uuid, usize, Item, bool, bool)> {
+        self.items_item_uses()
+    }
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----

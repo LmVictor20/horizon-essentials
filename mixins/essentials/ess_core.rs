@@ -467,6 +467,10 @@ pub trait Host {
     }
     /// Which raw slots of a player's open plugin container may be clicked (container_click's answers).
     fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {}
+    /// Item uses seen since the last call, before the use: (player, slot, held item, survival, on a block).
+    fn item_uses(&mut self) -> Vec<(Uuid, usize, Item, bool, bool)> {
+        Vec::new()
+    }
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----

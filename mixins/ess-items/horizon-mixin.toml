@@ -46,18 +46,52 @@ bindings = [
   { name = "s", ty = "&Option<crate::items::ItemStack>", value = "s" },
 ]
 
-# Players' packets: plugin container clicks (their policy), powertools (left clicks, attacks), unlimited items.
+# lan_guest_packet holds macros (no hook there): each packet's own first call instead.
+# Container clicks: lan_merchant_click is the first guard of every ContainerClick.
 [[injection]]
-id = "packet"
+id = "click"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client::game::lan_actions::Game<'_>::lan_guest_packet"
-helper = "hook_packet.rs"
+target = "horizon_client::game::lan_trading::Game<'_>::lan_merchant_click"
+helper = "hook_click.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
   { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
   { name = "conn", ty = "u32", value = "conn" },
-  { name = "packet", ty = "&horizon_protocol::packets::play::Serverbound", value = "&packet" },
+  { name = "p", ty = "&horizon_protocol::packets::play::ContainerClick", value = "p" },
+]
+
+# Powertools on attacking a player ({player}).
+[[injection]]
+id = "attack"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::guest_attack"
+helper = "hook_attack.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "id", ty = "i32", value = "id" },
+]
+
+# Powertools on a left click (the Punch packet resets the guest's attack strength).
+[[injection]]
+id = "punch"
+kind = "HEAD"
+target = "horizon_client::game::hand::Game<'_>::reset_attack_strength"
+helper = "hook_punch.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+# Unlimited items: the held stack before a use on a block (UseItemOn checks spawn protection first).
+[[injection]]
+id = "use"
+kind = "HEAD"
+target = "horizon_client::game::lan_actions::Game<'_>::under_spawn_protection"
+helper = "hook_use.rs"
+bindings = [
+  { name = "host", ty = "&crate::game::lan::LanHost", value = "host" },
+  { name = "gi", ty = "usize", value = "gi" },
 ]
 
 # Plugin containers live under stand-in chest keys at VEHICLE_KEY_Y: they stay valid.
@@ -72,13 +106,11 @@ bindings = [{ name = "id", ty = "i32", value = "id" }]
 # /workbench: a crafting table at VEHICLE_KEY_Y is valid.
 [[injection]]
 id = "table-valid"
-kind = "RETURN"
+kind = "HEAD"
+cancellable = true
 target = "horizon_client::game::lan_crafting::Game<'_>::lan_table_valid"
 helper = "hook_table.rs"
-bindings = [
-  { name = "value", ty = "bool", value = "$value" },
-  { name = "pos", ty = "[i32; 3]", value = "pos" },
-]
+bindings = [{ name = "pos", ty = "[i32; 3]", value = "pos" }]
 
 # /anvil, /loom...: hidden from the stations' block checks, back right after.
 [[injection]]
