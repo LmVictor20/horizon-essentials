@@ -21,3 +21,5 @@ name = "ess_glue_tp"
 source = "ess_glue_tp.rs"
 
 # This area's injections go below ([[injection]] entries with helpers in this folder).
+
+# No injections: deaths and respawns are polled through Host::is_dead (see ess_glue_tp.rs).

@@ -486,6 +486,9 @@ impl Host for GameHost<'_, '_> {
 
     // ----- Area extensions: Host methods an area added (delegate to its ess_glue_<area> functions) ----
     // ---- area tp ----
+    fn is_dead(&mut self, player: Uuid) -> bool {
+        self.tp_is_dead(player)
+    }
     // ---- end tp ----
     // ---- area social ----
     // ---- end social ----

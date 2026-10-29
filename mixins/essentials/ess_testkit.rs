@@ -101,6 +101,8 @@ mod kit {
         pub max_players: usize,
         /// Per-area fake state (areas add fields only in their region; initialize them in `new`'s region).
         // ---- area tp ----
+        /// Players on the death screen (Host::is_dead).
+        pub dead: std::collections::HashSet<Uuid>,
         // ---- end tp ----
         // ---- area social ----
         // ---- end social ----
@@ -191,6 +193,7 @@ mod kit {
                 stats: ServerStats { tps: 20.0, mspt: 12.5, uptime_ms: 3_600_000, memory_used_mb: 512, memory_max_mb: 2048, worlds: vec![("minecraft:overworld".into(), 441, 12, 3)] },
                 max_players: 20,
                 // ---- area tp ----
+                dead: std::collections::HashSet::new(),
                 // ---- end tp ----
                 // ---- area social ----
                 // ---- end social ----
@@ -590,6 +593,9 @@ mod kit {
         }
 
         // ---- area tp ----
+        fn is_dead(&mut self, player: Uuid) -> bool {
+            self.dead.contains(&player)
+        }
         // ---- end tp ----
         // ---- area social ----
         // ---- end social ----
