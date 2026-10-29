@@ -2229,7 +2229,7 @@ fn on_tick(ess: &mut Ess, host: &mut dyn Host) {
     fire_projectiles(ess, host);
     // One poll for every module's HTTP answers (ids carry the module's tag in their high bits).
     for (id, status, body) in host.http_poll() {
-        let _ = crate::game::ess_geoip::on_http(ess, host, id, status, &body);
+        let _ = crate::game::ess_geoip::on_http(ess, host, id, status, &body) || crate::game::ess_discord::on_http(ess, host, id, status, &body);
     }
 }
 
