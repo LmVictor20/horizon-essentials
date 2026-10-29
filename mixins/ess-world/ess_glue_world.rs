@@ -72,6 +72,8 @@ impl GameHost<'_, '_> {
     }
     pub(super) fn world_strike_lightning(&mut self, at: &Loc, effect_only: bool) {
     }
+    pub(super) fn world_set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {
+    }
     pub(super) fn world_remove_entities(&mut self, world: &str, center: Option<&Loc>, radius: Option<f64>, kinds: &[String]) -> usize {
         0
     }

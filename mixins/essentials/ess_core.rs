@@ -450,6 +450,8 @@ pub trait Host {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    /// Sets a vanilla statistic (`minecraft:custom/minecraft:time_since_rest` for /rest).
+    fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {}
     /// Starts an HTTP request (Discord REST, GeoIP download) off the server thread; its answer comes back
     /// from `http_poll` with the same id. Hosts without network never answer.
     fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {}

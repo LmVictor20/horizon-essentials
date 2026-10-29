@@ -496,6 +496,9 @@ impl Host for GameHost<'_, '_> {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {
+        self.world_set_statistic(player, stat, value)
+    }
     fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {
         self.world_http_request(id, method, url, headers, body)
     }
