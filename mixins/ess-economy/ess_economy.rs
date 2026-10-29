@@ -3344,6 +3344,12 @@ mod tests {
 
     const W: &str = "minecraft:overworld";
 
+    /// A player joins; the join lines (MOTD, mail notice) are dropped.
+    fn join(t: &mut TestServer, name: &str) -> Uuid {
+        let p = t.join(name);
+        t.said(p);
+        p
+    }
     fn money(t: &mut TestServer, p: Uuid) -> String {
         match t.ess.users.user(p).get("money") {
             Some(Value::String(s)) => s.clone(),
@@ -3455,8 +3461,8 @@ mod tests {
     #[test]
     fn balance_shows_starting_balance_and_others() {
         let mut t = TestServer::with_config("starting-balance: 50");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, bob, "12.5");
         assert_eq!(t.cmd(alice, "/balance"), ["Balance: $50"]);
         assert_eq!(t.cmd(alice, "/bal Bob"), ["Balance of Bob: $12.50"]);
@@ -3472,7 +3478,7 @@ mod tests {
     #[test]
     fn balance_of_unknown_player() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         assert_eq!(t.cmd(alice, "/balance Nobody"), ["Error: Player not found."]);
     }
 
@@ -3481,7 +3487,7 @@ mod tests {
     #[test]
     fn eco_give_take_set_reset() {
         let mut t = TestServer::with_config("starting-balance: 25");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         assert_eq!(t.console("eco give Alice 100"), ["$100 added to Alice account. New balance: $125"]);
         assert_eq!(t.said(alice), ["$100 has been added to your account."]);
         assert_eq!(money(&mut t, alice), "125");
@@ -3498,7 +3504,7 @@ mod tests {
     #[test]
     fn eco_respects_min_and_max_money() {
         let mut t = TestServer::with_config("min-money: 0\nmax-money: 1000");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.console("eco set Alice 70");
         assert_eq!(t.console("eco take Alice 200"), ["Error: The minimum balance a user can have is $0."]);
         assert_eq!(money(&mut t, alice), "70");
@@ -3515,7 +3521,7 @@ mod tests {
     #[test]
     fn min_money_is_always_negative_or_zero() {
         let mut t = TestServer::with_config("min-money: 100");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.console("eco take Alice 50");
         assert_eq!(money(&mut t, alice), "-50");
         assert_eq!(t.console("eco take Alice 100"), ["Error: The minimum balance a user can have is -$100."]);
@@ -3524,7 +3530,7 @@ mod tests {
     #[test]
     fn eco_exact_decimals_and_suffixes() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         for _ in 0..3 {
             t.console("eco give Alice 0.1");
         }
@@ -3536,8 +3542,8 @@ mod tests {
     #[test]
     fn eco_usage_and_targets() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         assert!(t.console("eco")[0].contains("eco"));
         assert!(t.console("eco foo Alice 1")[0].contains("eco"));
         assert!(t.console("eco give Alice")[0].contains("eco"));
@@ -3561,8 +3567,8 @@ mod tests {
     #[test]
     fn pay_moves_money() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         assert_eq!(t.cmd(alice, "/pay Bob 25"), ["$25 has been sent to Bob."]);
         assert_eq!(t.said(bob), ["$25 has been received from Alice."]);
@@ -3574,8 +3580,8 @@ mod tests {
     #[test]
     fn pay_validates_amounts() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        join(&mut t, "Bob");
         set_money(&mut t, alice, "10");
         assert_eq!(t.cmd(alice, "/pay Bob -5"), ["Error: Amount to pay must be positive."]);
         assert!(t.cmd(alice, "/pay Bob abc")[0].contains("pay"));
@@ -3585,8 +3591,8 @@ mod tests {
         assert_eq!(t.cmd(alice, "/pay Nobody 1"), ["Error: Player not found."]);
         assert_eq!(money(&mut t, alice), "10");
         let mut t = TestServer::with_config("minimum-pay-amount: 1");
-        let alice = t.join("Alice");
-        t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        join(&mut t, "Bob");
         assert_eq!(t.cmd(alice, "/pay Bob 0.5"), ["Error: The minimum amount you can pay is $1."]);
     }
 
@@ -3594,8 +3600,8 @@ mod tests {
     fn pay_with_loan_permission_goes_negative() {
         let mut t = TestServer::with_config("min-money: -50");
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.pay, essentials.eco.loan]\n");
-        let alice = t.join("Alice");
-        t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        join(&mut t, "Bob");
         assert_eq!(t.cmd(alice, "/pay Bob 30"), ["$30 has been sent to Bob."]);
         assert_eq!(money(&mut t, alice), "-30");
         assert_eq!(t.cmd(alice, "/pay Bob 30"), ["Error: You do not have sufficient funds."]);
@@ -3604,8 +3610,8 @@ mod tests {
     #[test]
     fn paytoggle_and_its_aliases() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         t.op("Bob");
         assert_eq!(t.cmd(bob, "/paytoggle"), ["You are no longer accepting payments."]);
@@ -3623,8 +3629,8 @@ mod tests {
     #[test]
     fn pay_confirmation() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.op("Alice");
         set_money(&mut t, alice, "100");
         assert_eq!(t.cmd(alice, "/payconfirmtoggle"), ["You will now be prompted to confirm payments."]);
@@ -3644,8 +3650,8 @@ mod tests {
     #[test]
     fn pay_confirmation_enabled_by_default() {
         let mut t = TestServer::with_config("default-enabled-confirm-commands: [pay]");
-        let alice = t.join("Alice");
-        t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         assert_eq!(t.cmd(alice, "/pay Bob 1"), ["To CONFIRM payment of $1, please repeat command: /pay Bob 1"]);
     }
@@ -3653,9 +3659,9 @@ mod tests {
     #[test]
     fn pay_offline_and_wildcards() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
-        let carol = t.join("Carol");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
+        let carol = join(&mut t, "Carol");
         set_money(&mut t, alice, "100");
         t.quit(bob);
         assert_eq!(t.cmd(alice, "/pay Bob 5"), ["You cannot pay offline users."]);
@@ -3671,14 +3677,14 @@ mod tests {
     #[test]
     fn pay_excludes_ignore_list() {
         let mut t = TestServer::with_config("pay-excludes-ignore-list: true");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         t.ess.users.user(bob).set("ignore", json!([uuid_string(alice)]));
         assert_eq!(t.cmd(alice, "/pay Bob 5"), ["Bob is not accepting payment."]);
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         t.ess.users.user(bob).set("ignore", json!([uuid_string(alice)]));
         assert_eq!(t.cmd(alice, "/pay Bob 5"), ["$5 has been sent to Bob."]);
@@ -3687,8 +3693,8 @@ mod tests {
     #[test]
     fn pay_over_max_money_is_refunded() {
         let mut t = TestServer::with_config("max-money: 100");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, alice, "50");
         set_money(&mut t, bob, "90");
         assert_eq!(t.cmd(alice, "/pay Bob 20"), ["This transaction would exceed the balance limit for this account."]);
@@ -3698,8 +3704,8 @@ mod tests {
     #[test]
     fn economy_log_writes_csv() {
         let mut t = TestServer::with_config("economy-log-enabled: true");
-        let alice = t.join("Alice");
-        t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        join(&mut t, "Bob");
         set_money(&mut t, alice, "100");
         t.cmd(alice, "/pay Bob 25");
         let log = std::fs::read_to_string(t.ess.dir.join("trade.log")).expect("trade.log");
@@ -3708,7 +3714,7 @@ mod tests {
         // Balance updates are only logged with economy-log-update-enabled.
         assert!(!log.contains("Update,Set,API"));
         let mut t = TestServer::with_config("economy-log-update-enabled: true\neconomy-log-uuids: true");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.console("eco set Alice 5");
         let log = std::fs::read_to_string(t.ess.dir.join("trade.log")).expect("trade.log");
         let expected = format!("\",\"{}\",5,money,$,\"\",\"\",\"\",\"\",\"\",\"\",\"\",\"\"5,", uuid_string(alice));
@@ -3719,9 +3725,9 @@ mod tests {
 
     fn baltop_server(config: &str) -> (TestServer, Uuid, Uuid, Uuid) {
         let mut t = TestServer::with_config(config);
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
-        let carol = t.join("Carol");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
+        let carol = join(&mut t, "Carol");
         set_money(&mut t, alice, "100");
         set_money(&mut t, carol, "300");
         (t, alice, bob, carol)
@@ -3768,9 +3774,9 @@ mod tests {
     #[test]
     fn balancetop_pages() {
         let mut t = TestServer::new();
-        let first = t.join("P00");
+        let first = join(&mut t, "P00");
         for i in 1..12 {
-            let p = t.join(&format!("P{i:02}"));
+            let p = join(&mut t, &format!("P{i:02}"));
             set_money(&mut t, p, &format!("{}", i * 10));
         }
         let page1 = t.cmd(first, "/baltop");
@@ -3794,7 +3800,7 @@ mod tests {
     }
     fn shop() -> (TestServer, Uuid) {
         let mut t = shop_with("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/setworth diamond 10"), ["Worth value set"]);
         assert_eq!(t.console("setworth iron_ingot 2.5"), ["Worth value set"]);
@@ -3818,7 +3824,7 @@ mod tests {
     #[test]
     fn worth_yml_lookup_forms() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         std::fs::write(t.ess.dir.join("worth.yml"), "worth:\n  stone:\n    '0': 3\n  dirt:\n    '*': 1.5\n  oaklog: 2.0\n  cobblestone: -1\n").unwrap();
         give(&mut t, alice, 0, "stone", 2);
         give(&mut t, alice, 1, "dirt", 2);
@@ -3925,7 +3931,7 @@ mod tests {
         assert_eq!(lines[2], "Error: You are not allowed to sell these named items: Precious", "{lines:?}");
         assert_eq!(count(&mut t, alice, "diamond"), 1);
         let mut t = shop_with("allow-selling-named-items: true");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         t.cmd(alice, "/setworth diamond 10");
         t.host.p(alice).inventory[0] = Some(named);
@@ -3935,7 +3941,7 @@ mod tests {
     #[test]
     fn sell_multipliers_and_stacks() {
         let mut t = shop_with("  vip: 2.5\ntrade-in-stacks:\n  ironingot: true");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         t.cmd(alice, "/setworth diamond 10");
         t.cmd(alice, "/setworth iron_ingot 1");
@@ -3958,7 +3964,7 @@ mod tests {
     #[test]
     fn command_costs_charge_players() {
         let mut t = TestServer::with_config("command-costs:\n  ping: 5");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         set_money(&mut t, alice, "10");
         assert_eq!(t.cmd(alice, "/ping"), ["$5 has been taken from your account.", "Pong!"]);
         assert_eq!(t.cmd(alice, "/pong"), ["$5 has been taken from your account.", "Pong!"]);
@@ -3973,14 +3979,14 @@ mod tests {
     fn command_cost_exemption_per_command() {
         let mut t = TestServer::with_config("command-costs:\n  ping: 5");
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.ping, essentials.nocommandcost.ping]\n");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         assert_eq!(t.cmd(alice, "/ping"), ["Pong!"]);
     }
 
     #[test]
     fn chat_costs_for_other_areas() {
         let mut t = TestServer::with_config("command-costs:\n  chat-shout: 2\n  chat-question: 1");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         set_money(&mut t, alice, "3");
         assert_eq!(charge_command_cost(&mut t.ess, &mut t.host, alice, "chat-shout"), Ok(()));
         assert_eq!(t.said(alice), ["$2 has been taken from your account."]);
@@ -3995,12 +4001,12 @@ mod tests {
     #[test]
     fn signs_need_enabled_signs() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (r, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Balance]", "", "", ""]);
         assert_eq!((r, l[0].as_str()), (Allow::Yes, "[Balance]"), "no signs enabled: untouched");
         let mut t = TestServer::with_config("enabledSigns: [buy]");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Balance]", "", "", ""]);
         assert_eq!(l[0], "[balance]", "a disabled Essentials sign is only normalized");
@@ -4011,7 +4017,7 @@ mod tests {
     #[test]
     fn sign_create_permission() {
         let mut t = signs_config("");
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         let (r, l) = write_sign(&mut t, bob, [0, 64, 0], ["[Buy]", "1", "diamond", "10"]);
         assert_eq!((r, l[0].as_str()), (Allow::Yes, "[buy]"));
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.buy.create]\n");
@@ -4022,7 +4028,7 @@ mod tests {
     #[test]
     fn sign_create_errors_mark_the_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (r, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Buy]", "x", "diamond", "10"]);
         assert_eq!((r, l[0].as_str()), (Allow::Yes, "§4[Buy]"));
@@ -4038,8 +4044,8 @@ mod tests {
     #[test]
     fn colour_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["&cHello", "&lbold", "", ""]);
         assert_eq!(l[..2], ["§cHello", "§lbold"]);
@@ -4055,14 +4061,14 @@ mod tests {
     #[test]
     fn balance_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         set_money(&mut t, alice, "42");
         write_sign(&mut t, alice, [0, 64, 0], ["[Balance]", "", "", ""]);
         assert_eq!(sign(&mut t, [0, 64, 0])[0], "§1[Balance]");
         assert_eq!(click(&mut t, alice, [0, 64, 0]), (Allow::No, vec!["Balance: $42".to_string()]));
         // Default players may use every sign (essentials.signs.use.*).
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["Balance: $0"]);
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [-essentials.signs.use.balance]\n");
         assert_eq!(click(&mut t, bob, [0, 64, 0]), (Allow::No, vec![]));
@@ -4071,7 +4077,7 @@ mod tests {
     #[test]
     fn sign_use_per_second() {
         let mut t = signs_config("sign-use-per-second: 2");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Balance]", "", "", ""]);
         assert_eq!(click(&mut t, alice, [0, 64, 0]).1.len(), 1);
@@ -4087,10 +4093,10 @@ mod tests {
     #[test]
     fn buy_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Buy]", "2", "diamond", "10"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["Error: You do not have sufficient funds."]);
         set_money(&mut t, bob, "25");
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["$10 has been taken from your account."]);
@@ -4106,10 +4112,10 @@ mod tests {
     #[test]
     fn buy_sign_bulk_while_sneaking() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Buy]", "1", "diamond", "4"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, bob, "100");
         give(&mut t, bob, 0, "diamond", 5);
         t.host.economy_sneaking.insert(bob);
@@ -4117,10 +4123,10 @@ mod tests {
         assert_eq!(count(&mut t, bob, "diamond"), 10);
         assert_eq!(money(&mut t, bob), "80");
         let mut t = signs_config("allow-bulk-buy-sell: false");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Buy]", "1", "diamond", "4"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, bob, "100");
         give(&mut t, bob, 0, "diamond", 5);
         t.host.economy_sneaking.insert(bob);
@@ -4131,11 +4137,11 @@ mod tests {
     #[test]
     fn sell_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Sell]", "2", "diamond", "$5"]);
         assert_eq!(l, ["§1[Sell]", "2", "diamond", "$5"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         give(&mut t, bob, 3, "diamond", 3);
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["$5 has been added to your account."]);
         assert_eq!(count(&mut t, bob, "diamond"), 1);
@@ -4146,11 +4152,11 @@ mod tests {
     #[test]
     fn exp_trades_on_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Buy]", "30", "xp", "1"]);
         assert_eq!(l, ["§1[Buy]", "30", "exp", "$1"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         set_money(&mut t, bob, "1");
         click(&mut t, bob, [0, 64, 0]);
         assert_eq!(t.host.p(bob).exp, 30);
@@ -4166,10 +4172,10 @@ mod tests {
     #[test]
     fn item_and_times_costs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Heal]", "1 diamond", "", ""]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["Error: You do not have 1x diamond."]);
         give(&mut t, bob, 0, "diamond", 2);
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["You have been healed."]);
@@ -4186,7 +4192,7 @@ mod tests {
     #[test]
     fn free_and_disposal_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Free]", "diamond", "", ""]);
         click(&mut t, alice, [0, 64, 0]);
@@ -4205,7 +4211,7 @@ mod tests {
         click(&mut t, alice, [3, 64, 0]);
         assert_eq!(t.host.p(alice).open.as_ref().unwrap().title, "Trash Can");
         // Without essentials.signs.disposal.name the custom lines are cleared.
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.create.disposal, essentials.signs.use.*]\n");
         let (_, l) = write_sign(&mut t, bob, [4, 64, 0], ["[Disposal]", "Trash", "", ""]);
         assert_eq!(l, ["§1[Disposal]", "", "", ""]);
@@ -4214,7 +4220,7 @@ mod tests {
     #[test]
     fn station_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         for (i, (name, station)) in [
             ("[Anvil]", Station::Anvil),
@@ -4238,7 +4244,7 @@ mod tests {
     #[test]
     fn heal_and_gamemode_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Heal]", "5", "", ""]);
         assert_eq!(l[1], "$5");
@@ -4264,7 +4270,7 @@ mod tests {
     #[test]
     fn time_and_weather_signs() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Time]", "day", "", ""]);
         assert_eq!(l[1], "§2Day");
@@ -4297,7 +4303,7 @@ mod tests {
     #[test]
     fn enchant_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Enchant]", "diamond_sword", "sharpness:9", ""]);
         assert_eq!(l[..3], ["§1[Enchant]", "diamond_sword", "sharpness:5"], "capped at the max level");
@@ -4319,7 +4325,7 @@ mod tests {
     #[test]
     fn repair_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let (_, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Repair]", "", "", ""]);
         assert_eq!(l[1], "Hand");
@@ -4360,7 +4366,7 @@ mod tests {
     fn signs_of_other_areas_dispatch_commands() {
         let mut t = signs_config("");
         fake_commands(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         std::fs::create_dir_all(t.ess.dir.join("warps")).unwrap();
         std::fs::write(t.ess.dir.join("warps/market.yml"), "name: market\nworld: world\nx: 1\ny: 2\nz: 3\nyaw: 0\npitch: 0\n").unwrap();
@@ -4379,7 +4385,7 @@ mod tests {
         write_sign(&mut t, alice, [6, 64, 0], ["[RandomTeleport]", "", "", ""]);
         let (_, l) = write_sign(&mut t, alice, [7, 64, 0], ["[Spawnmob]", "2", "zombie", ""]);
         assert_eq!(l[0], "§1[Spawnmob]");
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         for x in [0, 2, 4, 5, 6, 7] {
             click(&mut t, bob, [x, 64, 0]);
         }
@@ -4406,8 +4412,8 @@ mod tests {
     #[test]
     fn trade_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.create.trade, essentials.signs.break.trade, essentials.signs.use.*]\n");
         give(&mut t, alice, 0, "diamond", 5);
         let (r, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Trade]", "10", "1 diamond 5", ""]);
@@ -4445,8 +4451,8 @@ mod tests {
     #[test]
     fn sign_break_permission_and_support() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.op("Alice");
         write_sign(&mut t, alice, [0, 64, 0], ["[Balance]", "", "", ""]);
         assert_eq!(break_at(&mut t, bob, [0, 64, 0]), (Allow::No, vec![]));
@@ -4466,8 +4472,8 @@ mod tests {
     #[test]
     fn protection_sign() {
         let mut t = signs_config("");
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         let chest = [0, 64, 0];
         t.host.blocks.insert((W.into(), chest), "minecraft:chest[facing=north,type=single,waterlogged=false]".into());
         let (r, l) = write_sign(&mut t, alice, [1, 64, 0], ["[Protection]", "", "", ""]);
