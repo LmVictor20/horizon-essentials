@@ -3285,21 +3285,22 @@ mod tests {
         t.tick(1);
         assert_eq!(xyz(&mut t, b), ow(70.5, 64.0, 70.5));
         t.tick(1);
-        assert_eq!(t.said(a), ["Welcome Bob to the server!"]);
-        assert_eq!(t.said(b), ["Welcome Bob to the server!"]);
+        // Other areas may greet a joining player too (MOTD, mail): the announcement is the last line.
+        assert_eq!(t.said(a).last().map(String::as_str), Some("Welcome Bob to the server!"));
+        assert_eq!(t.said(b).last().map(String::as_str), Some("Welcome Bob to the server!"));
         // Returning players are not announced or moved.
         t.quit(b);
         at(&mut t, b, OW, 3.5, 64.0, 3.5);
         t.join("Bob");
         t.tick(3);
-        assert!(t.said(a).is_empty());
+        assert!(!t.said(a).iter().any(|l| l.contains("to the server!")));
         assert_eq!(xyz(&mut t, b), ow(3.5, 64.0, 3.5));
 
         let mut t = TestServer::with_config("newbies:\n  spawnpoint: none\n  announce-format: ''");
         let a = t.join("Alice");
         at(&mut t, a, OW, 3.5, 64.0, 3.5);
         t.tick(3);
-        assert!(t.said(a).is_empty());
+        assert!(!t.said(a).iter().any(|l| l.contains("to the server!")));
         assert_eq!(xyz(&mut t, a), ow(3.5, 64.0, 3.5));
     }
 
