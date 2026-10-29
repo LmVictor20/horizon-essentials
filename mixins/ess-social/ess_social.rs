@@ -3340,7 +3340,11 @@ mod tests {
 
     /// A server with these config lines; players joining through `j` have their join lines drained.
     fn srv(config: &str) -> TestServer {
-        TestServer::with_config(config)
+        let mut t = TestServer::with_config(config);
+        // The Spawn module's first-join welcome (tp area) is broadcast two ticks after a join; these tests
+        // count lines, so they run without it.
+        crate::game::ess_yaml::set(&mut t.ess.config, "newbies.announce-format", serde_json::json!(""));
+        t
     }
     fn j(t: &mut TestServer, name: &str) -> Uuid {
         let p = t.join(name);
