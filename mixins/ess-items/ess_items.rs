@@ -3854,12 +3854,14 @@ mod tests {
     fn kit_options_slots_once_full_inventory_and_auto_equip() {
         let (mut t, alice) = server("kit-auto-equip: true");
         write(&t, "kits.yml", "kits:\n  once:\n    delay: -1\n    items:\n    - slot:5 stone 1\n    - diamond_helmet 1\n    - $50\n  big:\n    delay: 0\n    items:\n    - dirt 64\n    - dirt 64\n");
-        assert_eq!(t.cmd(alice, "/kit once"), ["Received kit once."]);
+        // The kit's $50 line pays through the economy area.
+        assert_eq!(t.cmd(alice, "/kit once"), ["$50 has been added to your account.", "Received kit once."]);
         assert_eq!(t.host.p(alice).inventory[5], Some(it("stone", 1)));
         assert_eq!(t.host.p(alice).inventory[39], Some(it("diamond_helmet", 1)));
         assert_eq!(t.cmd(alice, "/kit once"), ["You can't use that kit again."]);
         assert_eq!(t.cmd(alice, "/kitreset once"), ["Reset cooldown for kit once."]);
-        assert_eq!(t.cmd(alice, "/kit once"), ["Received kit once."]);
+        // The kit's $50 line pays through the economy area.
+        assert_eq!(t.cmd(alice, "/kit once"), ["$50 has been added to your account.", "Received kit once."]);
         for s in 0..36 {
             t.host.p(alice).inventory[s] = Some(it("cobblestone", 64));
         }
@@ -4233,13 +4235,14 @@ mod tests {
         assert_eq!(t.cmd(alice, "/ptt"), ["All of your power tools have been disabled."]);
         assert!(!on_left_click(&mut t.ess, &mut t.host, alice));
         assert_eq!(t.cmd(alice, "/ptt"), ["All of your power tools have been enabled."]);
-        assert_eq!(t.cmd(alice, "/pt kill {player}"), ["kill {player} command assigned to stick."]);
+        // A vanilla command Essentials doesn't own (/kill is Essentials' since the admin area).
+        assert_eq!(t.cmd(alice, "/pt spectate {player}"), ["spectate {player} command assigned to stick."]);
         // {player} commands fire on hitting a player, not on a click.
         assert!(!on_left_click(&mut t.ess, &mut t.host, alice));
         let bob = t.join("Bob");
         assert!(on_attack_player(&mut t.ess, &mut t.host, alice, bob));
         t.tick(1);
-        assert_eq!(t.host.player_commands.last().unwrap().1, "kill Bob");
+        assert_eq!(t.host.player_commands.last().unwrap().1, "spectate Bob");
         assert_eq!(t.cmd(alice, "/pt"), ["All commands removed from stick."]);
         assert_eq!(t.cmd(alice, "/pt d:"), ["All powertool commands have been cleared."]);
         assert_eq!(t.cmd(alice, "/ptlist"), ["You have no power tools assigned."]);
