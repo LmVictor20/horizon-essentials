@@ -616,6 +616,32 @@ mod kit {
         // ---- area economy ----
         // ---- end economy ----
         // ---- area world ----
+        fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+            self.players.get(&player).map_or((0.2, 0.1), |p| (p.walk_speed, p.fly_speed))
+        }
+        fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {
+            if let Some(p) = self.players.get_mut(&player) {
+                p.stats.insert(stat.to_string(), value);
+            }
+        }
+        fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {
+            self.http_requests.push((id, method.to_string(), url.to_string(), headers.to_vec(), body.map(str::to_string)));
+        }
+        fn http_poll(&mut self) -> Vec<(u64, u16, String)> {
+            std::mem::take(&mut self.http_answers)
+        }
+        fn tcp_open(&mut self, id: u64, host: &str, port: u16, tls: bool) {
+            self.tcp_opened.push((id, host.to_string(), port, tls));
+        }
+        fn tcp_send(&mut self, id: u64, data: &[u8]) {
+            self.tcp_sent.entry(id).or_default().extend_from_slice(data);
+        }
+        fn tcp_close(&mut self, id: u64) {
+            self.tcp_closed.push(id);
+        }
+        fn tcp_poll(&mut self) -> Vec<(u64, Vec<u8>)> {
+            std::mem::take(&mut self.tcp_incoming)
+        }
         // ---- end world ----
     }
 

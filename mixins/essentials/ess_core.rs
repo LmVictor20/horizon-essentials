@@ -450,6 +450,10 @@ pub trait Host {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    /// Bukkit speeds (walk, fly) as last set (defaults 0.2, 0.1).
+    fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+        (0.2, 0.1)
+    }
     /// Sets a vanilla statistic (`minecraft:custom/minecraft:time_since_rest` for /rest).
     fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {}
     /// Starts an HTTP request (Discord REST, GeoIP download) off the server thread; its answer comes back

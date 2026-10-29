@@ -496,6 +496,9 @@ impl Host for GameHost<'_, '_> {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+        self.world_speeds(player)
+    }
     fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {
         self.world_set_statistic(player, stat, value)
     }
