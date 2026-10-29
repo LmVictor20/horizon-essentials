@@ -72,45 +72,46 @@ Area-wide notes (tp): messages name players by their account name (nicknames and
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /afk | core | away | todo | |
-| /broadcast | core | bc, bcast, shout | todo | |
-| /broadcastworld | core | bcw, bcastw, shoutworld | todo | |
-| /customtext | core |  | todo | |
-| /help | core |  | todo | |
-| /helpop | core | ac, amsg | todo | |
-| /ignore | core | unignore, delignore, remignore, rmignore | todo | |
-| /info | core | about, ifo, inform, news | todo | |
-| /mail | core | memo | todo | |
-| /me | core | action, describe | todo | |
-| /motd | core |  | todo | |
-| /msg | core | w, m, t, pm, tell, whisper | todo | |
-| /msgtoggle | core |  | todo | |
-| /mute | core | silence, unmute | todo | |
-| /nick | core | nickname | todo | |
-| /r | core | reply | todo | |
-| /realname | core |  | todo | |
-| /rtoggle | core | replytoggle | todo | |
-| /rules | core |  | todo | |
-| /socialspy | core |  | todo | |
-| /toggleshout | chat |  | todo | |
+| /afk | core | away | done | others, messages (essentials.afk.message), mute check; L3 social_chat |
+| /broadcast | core | bc, bcast, shout | done | `&` codes, `\n` lines; L3 social_chat |
+| /broadcastworld | core | bcw, bcastw, shoutworld | done | world by Bukkit name (world, world_nether, world_the_end) or id |
+| /customtext | core |  | partial | `/customtext <chapter> [page]` works; commands.yml aliases (`/vote` -> customtext) don't exist on Horizon |
+| /help | core |  | done | help.txt, or HelpInput over Essentials' commands the player may use; `/help /<cmd>` usage |
+| /helpop | core | ac, amsg | done | essentials.helpop.receive; L3 social_chat |
+| /ignore | core | unignore, delignore, remignore, rmignore | done | userdata `ignore` (uuids), essentials.chat.ignoreexempt; L3 social_msg |
+| /info | core | about, ifo, inform, news | done | chapters, pages, keywords, per-player/group files |
+| /mail | core | memo | done | read/clear/clearall/send/sendtemp/sendall/sendtempall, console; userdata `mail` as EssentialsX; L3 social_mail |
+| /me | core | action, describe | done | chat radius, ignore, spies; L3 social_chat |
+| /motd | core |  | done | |
+| /msg | core | w, m, t, pm, tell, whisper | done | console, wildcards (essentials.msg.multiple), colors by permission; L3 social_msg |
+| /msgtoggle | core |  | done | essentials.msgtoggle.bypass |
+| /mute | core | silence, unmute | done | time + reason, max-mute-time, exempt/offline/notify, expiry on the 50-tick timer |
+| /nick | core | nickname | done | prefix, length, regex, blacklist, uniqueness, colors by permission; L3 social_chat |
+| /r | core | reply | done | last-message-reply-recipient + timeout; L3 social_msg |
+| /realname | core |  | done | |
+| /rtoggle | core | replytoggle | done | userdata `last-message-reply-recipient` |
+| /rules | core |  | done | |
+| /socialspy | core |  | done | |
+| /toggleshout | chat |  | done | chat.persist-shout / shout-default |
 
 **Features (social)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| Chat module: format, group-formats, placeholders, world-aliases | todo | |
-| local chat radius, ! shout, ? question, chat spy (chat.spy) | todo | |
-| chat colour/format/magic/rgb/url permissions | todo | |
-| custom-join-message, custom-quit-message, custom-new-username-message, silent join/quit | todo | |
-| motd on join (delay-motd) | todo | |
-| mail: notify on join and every notify-player-of-mail-cooldown, mails-per-minute, sendtemp expiry | todo | |
-| AFK: auto-afk, auto-afk-timeout kick/commands, freeze, cancel-on-*, broadcast, afk-list-name, sleep-ignores-afk | todo | |
-| ignore: chat, msg, mail, tpa filtered | todo | |
-| socialspy messages and socialspy-commands | todo | |
-| mute: chat, msg, mail, mute-commands | todo | |
-| nicknames: prefix, length, regex, blacklist, uniqueness, ops-name-color, change-displayname/tab | todo | |
-| text files: chapters, pages, keywords | todo | |
-| message overrides: messages*.properties in the data folder, per-player-locale | todo | |
+| Chat module: format, group-formats, placeholders, world-aliases | partial | all placeholders but {TEAMPREFIX}/{TEAMSUFFIX}/{TEAMNAME} (empty: no scoreboard-team API); {PREFIX}/{SUFFIX}/{GROUP} from permissions.yml. Chat equal to vanilla's stays signed player chat, anything else is re-sent as system chat (L3 social_chat) |
+| local chat radius, ! shout, ? question, chat spy (chat.spy) | done | |
+| chat colour/format/magic/rgb/url permissions | done | per-color nodes too (essentials.chat.red...) |
+| custom-join-message, custom-quit-message, custom-new-username-message, silent join/quit | partial | join/quit/silent/hide-join-quit-messages-above done (vanilla lines suppressed by the hub hooks); new-username message and {OLDUSERNAME} need the previous name (CORE-REQUESTS 3) |
+| motd on join (delay-motd) | done | L3 social_chat |
+| mail: notify on join and every notify-player-of-mail-cooldown, mails-per-minute, sendtemp expiry | done | L3 social_mail |
+| AFK: auto-afk, auto-afk-timeout kick/commands, freeze, cancel-on-*, broadcast, afk-list-name, sleep-ignores-afk | partial | done except sleep-ignores-afk-players, disable-item-pickup-while-afk, cancel-afk-on-fish (no sleep/pickup/fishing events); cancel-on-interact only on right clicks the core reports |
+| ignore: chat, msg, mail, tpa filtered | partial | chat, msg, mail, /me, broadcasts done; tpa belongs to tp (`ess_social::ignores_player`) |
+| socialspy messages and socialspy-commands | partial | Essentials' commands only: vanilla/other commands don't reach command listeners (CORE-REQUESTS 2) |
+| mute: chat, msg, mail, mute-commands | partial | mute-commands only for Essentials' commands (CORE-REQUESTS 2) |
+| nicknames: prefix, length, regex, blacklist, uniqueness, ops-name-color, change-displayname/tab | partial | all rules done (own java.util.regex subset); the nick shows in Essentials' chat lines and the tab list (change-playerlist, afk-list-name), not in vanilla's join/leave lines (CORE-REQUESTS 5) |
+| text files: chapters, pages, keywords | done | {BALANCE} reads userdata `money`; {PLUGINS}/{VERSION} are fixed strings |
+| message overrides: messages*.properties in the data folder, per-player-locale | partial | overrides by the core; English only (no per-player locale) |
+| command tree: every Essentials label tab-completes on vanilla clients | done | greedy-string nodes merged into the hub's mod command tree |
 
 ## admin (28 commands)
 
