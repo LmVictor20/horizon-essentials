@@ -130,7 +130,7 @@ Generated once by tools/parity_table.py from plugin.yml; each area keeps its own
 | /kick | core |  | done | `kick.exempt`, `kick.notify`, hidden targets; L3 admin_bans |
 | /kickall | core |  | done | spares the sender and `kickall.exempt` |
 | /kill | core |  | done | `kill.exempt` / `kill.force`, cancelled damage, `*`; sets health through the world area's glue |
-| /list | core | online, playerlist, plist, who | done | groups from permissions.yml, `list:` merge/hidden/limit/`*`, `[HIDDEN]`/`[AFK]` tags; L3 admin_info |
+| /list | core | online, playerlist, plist, who | done | guests' `/list` is rerouted from Horizon's built-in answer (guest_command HEAD hook); groups from permissions.yml, `list:` merge/hidden/limit/`*`, `[HIDDEN]`/`[AFK]` tags; L3 admin_info |
 | /near | core | nearby | done | |
 | /playtime | core |  | done | `minecraft:play_time` from live counters, or the stats file for offline players |
 | /seen | core | alts | partial | online/offline, bans and expiry, IP, logout location, whitelist, UUID, alts and IP search (L3 admin_info). "First login" is omitted (Horizon keeps no first-join time); no GeoIP |
