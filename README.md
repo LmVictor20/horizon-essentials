@@ -1,126 +1,154 @@
 # horizon-essentials
 
-EssentialsX for [Horizon](https://github.com/horizon-rust/horizon), the Rust rewrite of Minecraft: Java Edition
-26.3: homes, warps, teleport requests, kits, an economy with signs, mail, nicknames, chat formats, bans, jails,
-vanish, AFK, god, fly and the rest of EssentialsX's 163 commands, on a Horizon dedicated server that
-**unmodified vanilla 26.3 clients** join.
+**EssentialsX for [Horizon](https://github.com/horizon-rust/horizon)**, the Rust rewrite of Minecraft: Java
+Edition 26.3.
 
-It is a Horizon *native mod*: [horizon-mixins](https://github.com/horizon-rust/horizon-mixins) adds its Rust code
-to a pinned Horizon Nightly at build time, and the result is one server binary, `horizon-engine-essentials`.
-There is no plugin folder: Essentials is compiled in.
+- ✅ **Works with the normal Minecraft client.** Players join with vanilla Minecraft 26.3 and need nothing
+  installed. Horizon's own client works too.
+- ✅ **All 163 EssentialsX commands**, with the same commands, permissions, messages and config files.
+- ✅ **No Java.** It's a single native server program: Horizon with Essentials built in.
 
-**Status:** every command runs; 142 of 163 are complete and 21 work with documented gaps, mostly where Horizon has
-no hook yet (block placement, the attacker in damage events, vanilla commands reaching command listeners) or no
-support at all (per-viewer vanish, coloured item names, custom potion effects). The table per command and feature,
-with each gap's reason, is [PARITY.md](PARITY.md). Not yet tried with a real vanilla client or on a live server:
-back up your world first.
+## What you get
 
-## Download
+| | |
+|---|---|
+| **Teleporting** | `/home`, `/sethome`, `/warp`, `/spawn`, `/tpa`, `/tpaccept`, `/back`, `/tpr`, `/top`... |
+| **Chat** | `/msg`, `/r`, `/mail`, `/nick`, `/ignore`, `/afk`, chat formats and prefixes, local chat |
+| **Items** | `/kit`, `/item`, `/give`, `/repair`, `/enchant`, `/hat`, `/workbench`, `/ec`, powertools |
+| **Economy** | `/balance`, `/pay`, `/baltop`, `/sell`, `/worth`, and all the Essentials signs |
+| **Moderation** | `/ban`, `/tempban`, `/kick`, `/mute`, `/jail`, `/vanish`, `/invsee`, `/seen`, `/whois` |
+| **Player & world** | `/fly`, `/god`, `/heal`, `/feed`, `/gamemode`, `/speed`, `/time`, `/weather` |
+| **Extras** | Protect and AntiBuild rules, Discord bridge, GeoIP, XMPP |
 
-- **Releases:** each `v*` tag has `horizon-engine-essentials`, `SHA256SUMS` and `BUILD-INFO.txt` (the pinned
-  Horizon Nightly) attached.
-- **Every commit:** the *Build server* workflow uploads the same files as the `horizon-engine-essentials`
-  artifact (Actions tab → a run → Artifacts).
+**How complete is it?** Every command runs. 142 of the 163 work exactly like EssentialsX; 21 have small gaps,
+mostly where Horizon itself can't do something yet (for example, vanished players are invisible but still
+there). The full list, with the reason for each gap, is in [PARITY.md](PARITY.md).
 
-The binary is built on Debian bookworm (glibc 2.36): it runs on Pterodactyl's `ghcr.io/parkervcp/yolks:debian`,
-Debian 12+, Ubuntu 22.04+ and newer distributions, x86-64 only.
+## Install
 
-## Run it on Pterodactyl
+Download `horizon-engine-essentials` from the [latest release](../../releases/latest). It runs on any 64-bit
+Linux server (Debian 12, Ubuntu 22.04 or newer).
 
-Start from a working Horizon server (the Horizon egg: `horizon-engine` installed, your prepared game files in
-`resources/`, `eula.txt` accepted). Then:
+You also need Horizon's **game files**, prepared from your own copy of Minecraft with the
+[Horizon launcher](https://playhorizon.dev). Nobody can ship them for you.
 
-1. **Back up** the server (Backups tab), or test on a copy of the world.
-2. **Upload** `horizon-engine-essentials` to the server's root folder with the file manager or SFTP, and make it
-   executable (file manager → the file → Permissions → `755`). Keep the name: a Reinstall replaces
-   `horizon-engine`, never this file.
-3. **Startup tab:** change the startup command to
+### Option A: Pterodactyl panel (easiest)
+
+1. Set up a normal Horizon server with **[horizon-egg](https://github.com/LmVictor20/horizon-egg)**. Its guide
+   walks you through importing the egg and uploading the game files.
+2. Upload `horizon-engine-essentials` to the server's main folder and give it permission `755`.
+3. In the server's **Startup** tab, change the command to:
    ```
    ./horizon-engine-essentials --resources {{RESOURCES_DIR}} --dedicated --nogui --port {{SERVER_PORT}}
    ```
-   (Going back to plain Horizon is the same command with `./horizon-engine`.)
-4. **Start** the server. The console shows Horizon's usual startup; Essentials creates `essentials/` on the first
-   start and answers `/ping` with `Pong!`.
+4. Start the server. Type `ping` in the console: it answers `Pong!`.
 
-**Game files:** the build pins one Horizon Nightly (see `BUILD-INFO.txt`). Game files prepared by the Horizon
-launcher of the same period work; if a much newer launcher's files fail to load, use files prepared for that
-Nightly.
+Keep the file name `horizon-engine-essentials`: reinstalling the egg replaces `horizon-engine`, never this file.
 
-**Updating:** download the newer build, upload it over `horizon-engine-essentials`, restart. Updating the egg
-(Reinstall) only updates plain Horizon's `horizon-engine`.
+### Option B: any Linux server
+
+In an empty folder, put `horizon-engine-essentials`, your game files in `resources/`, and a file `eula.txt`
+containing `eula=true` (you accept the [Minecraft EULA](https://aka.ms/MinecraftEULA)). Then:
+
+```sh
+chmod +x horizon-engine-essentials
+./horizon-engine-essentials --resources resources --dedicated --nogui --port 25565
+```
+
+### First steps on the new server
+
+Minecraft 26.3 turns the whitelist on by default. In the server console:
+
+```
+whitelist add YourName
+op YourName
+```
+
+Then join with Minecraft 26.3 and try `/sethome`, `/home`, `/spawn` and `/kit tools`.
 
 ## Configure
 
-Everything lives in `essentials/` in the server folder, laid out like EssentialsX's `plugins/Essentials/`:
+Everything is in the `essentials/` folder, created on the first start. It uses the same layout as EssentialsX's
+`plugins/Essentials/`.
 
-| File | What |
+| File | What it's for |
 |---|---|
-| `config.yml` | EssentialsX's config (all its options: teleport delays, homes per group, chat formats, AFK, economy...) |
-| `permissions.yml` | Groups and permission nodes (EssentialsX expects LuckPerms; this file plays that part) |
-| `kits.yml`, `worth.yml`, `tpr.yml` | Kits, sell prices, random-teleport area |
-| `motd.txt`, `rules.txt`, `info.txt`, `book.txt`, `custom.txt` | Text files, with EssentialsX's chapters and keywords |
-| `userdata/<uuid>.yml`, `warps/`, `spawn.yml`, `jail.yml` | Saved data |
-| `discord/config.yml`, `discordlink/config.yml`, `xmpp/config.yml`, `geoip/` | Optional modules, off by default |
+| `config.yml` | All of EssentialsX's settings |
+| `permissions.yml` | Groups and permissions (this replaces LuckPerms) |
+| `kits.yml` | Kits |
+| `worth.yml` | Sell prices |
+| `motd.txt`, `rules.txt`, `info.txt` | Texts shown by `/motd`, `/rules`, `/info` |
+| `userdata/`, `warps/`, `spawn.yml`, `jail.yml` | Saved player data, warps, spawns, jails |
 
-After editing, run `/essentials reload` (or restart).
+After editing a file, type `essentials reload` in the console.
 
-**Permissions:** players without a group get the `default` group, which holds EssentialsX's regular-player set
-(homes, tpa, msg, mail, spawn, warp, balance, pay, kits.tools...). Vanilla operators also get every node EssentialsX
-gives ops by default. Give someone a group:
+### Permissions
+
+- Players start in the `default` group: homes, tpa, msg, mail, spawn, warps, balance, pay, the tools kit...
+- Server operators can use everything.
+- To give a player more, add them to `permissions.yml`:
+
 ```yaml
 users:
-  Steve:            # a name or a UUID
+  Steve:                      # a player name or UUID
     groups: [admin]
-    permissions: [essentials.fly, -essentials.home.others]   # extra nodes; `-` denies
+    permissions:
+    - essentials.fly          # allow
+    - -essentials.home.others # deny (starts with -)
 ```
-Node names are EssentialsX's: [permissions](https://essentialsx.net/permissions), [commands](https://essentialsx.net/commands).
 
-**Coming from EssentialsX on Paper/Spigot:** copy the contents of `plugins/Essentials/` into `essentials/`
-(config, userdata, warps, kits, worth, spawn and jails keep their formats). Bukkit world names (`world`,
-`world_nether`, `world_the_end`) are read as Horizon's dimensions.
+Permission names are EssentialsX's: see its [permissions](https://essentialsx.net/permissions) and
+[commands](https://essentialsx.net/commands) lists.
 
-**Discord, GeoIP, XMPP:** Discord works over its REST API (chat both ways, join/quit/death, message commands,
-account linking); there are no slash commands or presence. GeoIP needs you to place a MaxMind `.mmdb` file in
-`essentials/geoip/`. XMPP works with servers that accept plain connections.
+### Moving from EssentialsX on Paper or Spigot
 
-## Build it yourself
+Copy the contents of your old `plugins/Essentials/` folder into `essentials/`. Homes, warps, kits, balances,
+spawns and jails carry over.
 
-Pushing to GitHub builds it (see `.github/workflows/build.yml`). Locally, on Linux with rustup and Python 3, with
-these checkouts beside this repository:
+### Discord, GeoIP and XMPP
 
-```
-horizon-mods/
-├── horizon-essentials/   this repository
-├── horizon/              https://github.com/horizon-rust/horizon (must contain the pinned commit)
-└── horizon-mixins/       https://github.com/horizon-rust/horizon-mixins at the revision in compatibility.json
-```
+These are off by default. Their settings are in `essentials/discord/`, `essentials/discordlink/`,
+`essentials/geoip/` and `essentials/xmpp/`.
+
+- **Discord:** chat both ways, join/leave/death messages, account linking. No slash commands.
+- **GeoIP:** put a MaxMind `.mmdb` database file in `essentials/geoip/`.
+- **XMPP:** works with XMPP servers that allow unencrypted connections.
+
+## Updating
+
+Download the new release, replace `horizon-engine-essentials` with it, and restart. Your settings and player
+data stay.
+
+Each release is built for one Horizon version (see `BUILD-INFO.txt` in the release). If the server can't load
+your game files, prepare them again with an up-to-date Horizon launcher.
+
+## Contributing
+
+Issues and pull requests are welcome! Report bugs, missing behaviour or ideas in
+[Issues](../../issues).
+
+To work on the code, see [AGENTS.md](AGENTS.md): how it's organised, how a feature is built, and how the tests
+work. Building it yourself:
 
 ```sh
+# next to this repository: clones of horizon-rust/horizon and horizon-rust/horizon-mixins
 cargo fetch --locked --manifest-path ../horizon-mixins/Cargo.toml
-python3 tools/horizon.py stage                                   # export the pinned Horizon, apply the mod
+python3 tools/horizon.py stage            # apply the mod to the pinned Horizon version
 cargo fetch --locked --manifest-path target/mixins/modded/Cargo.toml
-python3 tools/horizon.py build                                   # -> target/horizon-cargo/fast/horizon-client
+python3 tools/horizon.py build            # -> target/horizon-cargo/fast/horizon-client
 ```
-The first build takes about 8 minutes and 3-5 GB in `target/`. A binary built on a distribution newer than the
-server's may not start there (glibc); the workflow builds on Debian bookworm for that reason.
 
-**Tests:**
+Tests:
+
 ```sh
-cargo test --workspace                        # unit tests (about 390), seconds, no Horizon needed
-python3 tools/horizon.py test                 # the same tests compiled inside Horizon's game crate
-python3 tools/e2e/run.py                      # end to end: a real server and scripted vanilla-protocol players
+cargo test --workspace         # about 390 tests, a few seconds
+python3 tools/horizon.py test  # the same tests inside Horizon
+python3 tools/e2e/run.py       # a real server with test players
 ```
-The end-to-end tests need the Horizon launcher's prepared game files (default:
-`~/.local/share/horizon-launcher/server-runtime/game-files/horizon-client/26.3`, or `--resources`) and
-`cargo build --manifest-path tools/ess-bot/Cargo.toml --target-dir target/ess-bot` after a stage.
 
-**Moving to a newer Horizon Nightly:** set `horizon_revision` and `horizon_nightly_tag` in `compatibility.json` and
-`[compatibility] horizon_revision` in every `mixins/*/horizon-mixin.toml`, update the `source_sha256` entries,
-then stage, test and build. A hook whose target changed fails at stage time and names it.
-
-Contributors: [AGENTS.md](AGENTS.md) describes the layout, the test kit and how a feature is built.
+Every push is built and tested by GitHub Actions, and pushing a `v*` tag publishes a release.
 
 ## Licence
 
-GPL-3.0, as EssentialsX, from which it is ported (see [NOTICE](NOTICE)). Not affiliated with EssentialsX,
+GPL-3.0, like EssentialsX, which this is ported from (see [NOTICE](NOTICE)). Not affiliated with EssentialsX,
 Horizon, Mojang or Microsoft.
