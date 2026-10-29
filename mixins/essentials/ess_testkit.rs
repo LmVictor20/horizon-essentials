@@ -121,6 +121,16 @@ mod kit {
         pub economy_sneaking: std::collections::HashSet<Uuid>,
         // ---- end economy ----
         // ---- area world ----
+        /// HTTP requests started: (id, method, url, headers, body).
+        pub http_requests: Vec<(u64, String, String, Vec<(String, String)>, Option<String>)>,
+        /// Answers the next `http_poll` hands back: (id, status, body).
+        pub http_answers: Vec<(u64, u16, String)>,
+        /// TCP connections opened: (id, host, port, tls), bytes sent per id, closed ids.
+        pub tcp_opened: Vec<(u64, String, u16, bool)>,
+        pub tcp_sent: HashMap<u64, Vec<u8>>,
+        pub tcp_closed: Vec<u64>,
+        /// Bytes the next `tcp_poll` hands back.
+        pub tcp_incoming: Vec<(u64, Vec<u8>)>,
         // ---- end world ----
         pub _regions: (),
     }
@@ -216,6 +226,12 @@ mod kit {
                 economy_sneaking: Default::default(),
                 // ---- end economy ----
                 // ---- area world ----
+                http_requests: Vec::new(),
+                http_answers: Vec::new(),
+                tcp_opened: Vec::new(),
+                tcp_sent: HashMap::new(),
+                tcp_closed: Vec::new(),
+                tcp_incoming: Vec::new(),
                 // ---- end world ----
                 _regions: (),
             }
@@ -638,6 +654,32 @@ mod kit {
         }
         // ---- end economy ----
         // ---- area world ----
+        fn speeds(&mut self, player: Uuid) -> (f32, f32) {
+            self.players.get(&player).map_or((0.2, 0.1), |p| (p.walk_speed, p.fly_speed))
+        }
+        fn set_statistic(&mut self, player: Uuid, stat: &str, value: i64) {
+            if let Some(p) = self.players.get_mut(&player) {
+                p.stats.insert(stat.to_string(), value);
+            }
+        }
+        fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {
+            self.http_requests.push((id, method.to_string(), url.to_string(), headers.to_vec(), body.map(str::to_string)));
+        }
+        fn http_poll(&mut self) -> Vec<(u64, u16, String)> {
+            std::mem::take(&mut self.http_answers)
+        }
+        fn tcp_open(&mut self, id: u64, host: &str, port: u16, tls: bool) {
+            self.tcp_opened.push((id, host.to_string(), port, tls));
+        }
+        fn tcp_send(&mut self, id: u64, data: &[u8]) {
+            self.tcp_sent.entry(id).or_default().extend_from_slice(data);
+        }
+        fn tcp_close(&mut self, id: u64) {
+            self.tcp_closed.push(id);
+        }
+        fn tcp_poll(&mut self) -> Vec<(u64, Vec<u8>)> {
+            std::mem::take(&mut self.tcp_incoming)
+        }
         // ---- end world ----
     }
 
