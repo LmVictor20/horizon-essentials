@@ -911,6 +911,8 @@ pub struct Ess {
     state: HashMap<TypeId, Box<dyn Any>>,
     /// Last known location of online players (for `moved`).
     pub last_loc: HashMap<Uuid, Loc>,
+    /// For join listeners: the player's account name before this join (None on a first join).
+    pub previous_names: HashMap<Uuid, Option<String>>,
 }
 
 impl Ess {
@@ -943,6 +945,7 @@ impl Ess {
             messages: BTreeMap::new(),
             state: HashMap::new(),
             last_loc: HashMap::new(),
+            previous_names: HashMap::new(),
         };
         ess.reload();
         ess.users.index_names();
@@ -1240,6 +1243,9 @@ impl Ess {
         let first = !self.users.exists(player);
         let name = host.name(player).unwrap_or_default();
         let now = host.now_millis();
+        // The account name before this join (custom-new-username-message, reset-nick-on-name-change).
+        let previous = self.users.get(player).and_then(|u| u.name());
+        self.previous_names.insert(player, previous);
         {
             let u = self.users.user(player);
             u.set("last-account-name", json!(name));

@@ -231,7 +231,8 @@ def collect(selection):
         spec.loader.exec_module(module)
         for name in sorted(n for n in dir(module) if n.startswith("test_")):
             key = f"{file.stem}.{name[5:]}"
-            if not selection or any(key == s or file.stem == s or key.startswith(s + ".") for s in selection):
+            if not selection or any(key == s or file.stem == s or key.startswith(s + ".") or file.stem.startswith(s + "_")
+                                    for s in selection):
                 tests.append((key, getattr(module, name)))
     return tests
 
