@@ -20,4 +20,76 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_social"
 source = "ess_glue_social.rs"
 
-# This area's injections go below ([[injection]] entries with helpers in this folder).
+# The hub lives in the horizon_client library and the glue in the game binary: they share this per-hub state
+# (public accessors): (flags, display/tab names and the command tree as JSON; chats waiting for Essentials).
+[[state]]
+id = "ess"
+target = "horizon_client::lan::hub::Hub"
+ty = "(serde_json::Value, Vec<(chat::ChatMessage, horizon_protocol::packets::play::ChatTypeBound, String)>)"
+initial = "::core::default::Default::default()"
+
+[[state.constructor]]
+target = "horizon_client::lan::hub::Hub::new"
+selector = "Self"
+require = 1
+
+# Player chat waits for Essentials (EssentialsChat formats, local/shout, mute, ignore). handle_chat itself is
+# never cancelled, so the secure chat chain advances; only the broadcast is held until the next tick.
+[[injection]]
+id = "chat"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::lan::hub::chat::Hub::broadcast_chat"
+helper = "hook_chat.rs"
+bindings = [
+  { name = "hub", ty = "&mut Hub", value = "&mut *self" },
+  { name = "message", ty = "&ChatMessage", value = "message" },
+  { name = "bound", ty = "&play::ChatTypeBound", value = "bound" },
+  { name = "line", ty = "&String", value = "&line" },
+]
+
+# Every Essentials label in the players' command trees (vanilla clients tab-complete them).
+[[injection]]
+id = "commands"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::lan::hub::Hub::set_mod_commands"
+helper = "hook_commands.rs"
+bindings = [
+  { name = "hub", ty = "&mut Hub", value = "&mut *self" },
+  { name = "key", ty = "u64", value = "key" },
+  { name = "commands", ty = "&serde_json::Value", value = "&commands" },
+]
+
+# Vanilla's join/quit lines give way to Essentials' when it sends its own.
+[[injection]]
+id = "join-line"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::lan::hub::Hub::broadcast_except"
+helper = "hook_join_line.rs"
+bindings = [
+  { name = "hub", ty = "&Hub", value = "self" },
+  { name = "packet", ty = "&C", value = "packet" },
+]
+
+[[injection]]
+id = "quit-line"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::lan::hub::Hub::system_message"
+helper = "hook_quit_line.rs"
+bindings = [
+  { name = "hub", ty = "&Hub", value = "self" },
+  { name = "content", ty = "&Tag", value = "&content" },
+]
+
+# After the core's tick hook (same site, mod id order): held chat, command tree, join/quit flags.
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "hook_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
