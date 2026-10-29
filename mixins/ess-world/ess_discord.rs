@@ -1953,7 +1953,8 @@ mod tests {
     #[test]
     fn silent_join_and_vanished_quit_are_hidden() {
         let mut t = server_with("", "");
-        std::fs::write(t.ess.dir.join("config.yml"), "allow-silent-join-quit: true\n").unwrap();
+        let config = format!("{}allow-silent-join-quit: true\n", crate::game::ess_testkit::TEST_BASELINE);
+        std::fs::write(t.ess.dir.join("config.yml"), config).unwrap();
         t.ess.reload();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.silentjoin]\n");
         boot(&mut t);
@@ -1963,7 +1964,8 @@ mod tests {
         t.ess.users.user(alice).set("vanished", json!(true));
         t.quit(alice);
         t.tick(1);
-        assert!(posts_to(&take(&mut t), "/messages").is_empty());
+        let posts = posts_to(&take(&mut t), "/messages");
+        assert!(posts.is_empty(), "{posts:?}");
     }
 
     #[test]

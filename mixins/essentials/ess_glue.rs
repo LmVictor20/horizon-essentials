@@ -499,9 +499,6 @@ impl Host for GameHost<'_, '_> {
     fn first_played(&mut self, player: Uuid) -> Option<i64> {
         self.admin_first_played(player)
     }
-    fn speeds(&mut self, player: Uuid) -> (f32, f32) {
-        self.admin_speeds(player)
-    }
     // ---- end admin ----
     // ---- area items ----
     // ---- end items ----

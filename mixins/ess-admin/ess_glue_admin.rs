@@ -108,7 +108,4 @@ impl GameHost<'_, '_> {
     }
 
     /// Horizon's guests keep no Bukkit speeds: the vanilla defaults.
-    pub(super) fn admin_speeds(&mut self, _player: Uuid) -> (f32, f32) {
-        (0.1, 0.2)
-    }
 }

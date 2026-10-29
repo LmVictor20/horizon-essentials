@@ -3470,7 +3470,7 @@ mod tests {
         assert_eq!(t.console("balance Alice"), ["Balance of Alice: $50"]);
         assert!(t.console("balance")[0].contains("balance"), "console needs a player");
         // Without essentials.balance.others the argument is ignored.
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.balance]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.balance]\n");
         assert_eq!(t.cmd(alice, "/bal Bob"), ["Balance: $50"]);
         assert_eq!(t.cmd(alice, "/bal Bob extra")[0], "Command Help: /bal");
     }
@@ -3599,7 +3599,7 @@ mod tests {
     #[test]
     fn pay_with_loan_permission_goes_negative() {
         let mut t = TestServer::with_config("min-money: -50");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.pay, essentials.eco.loan]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.pay, essentials.eco.loan]\n");
         let alice = join(&mut t, "Alice");
         join(&mut t, "Bob");
         assert_eq!(t.cmd(alice, "/pay Bob 30"), ["$30 has been sent to Bob."]);
@@ -3750,7 +3750,7 @@ mod tests {
         let (mut t, alice, _, _) = baltop_server("baltop-entry-limit: 1");
         assert_eq!(&t.cmd(alice, "/baltop")[2..], ["Server Total: $400", "1. Carol, $300"]);
         let (mut t, alice, _, _) = baltop_server("");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.balancetop]\nusers:\n  carol:\n    permissions: [essentials.balancetop.exclude]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.balancetop]\nusers:\n  carol:\n    permissions: [essentials.balancetop.exclude]\n");
         assert_eq!(&t.cmd(alice, "/baltop")[2..], ["Server Total: $100", "1. Alice, $100", "2. Bob, $0"]);
         // Playtime requirement (online players' play_time statistic, in ticks).
         let (mut t, alice, _, carol) = baltop_server("baltop-requirements:\n  minimum-balance: 0\n  minimum-playtime: 60");
@@ -3910,7 +3910,7 @@ mod tests {
     #[test]
     fn sell_permissions() {
         let (mut t, alice) = shop();
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.sell, essentials.setworth]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.sell, essentials.setworth]\n");
         t.host.p(alice).op = 0;
         give(&mut t, alice, 0, "diamond", 2);
         assert_eq!(t.cmd(alice, "/sell hand"), ["Error: You do not have permission to hand sell."]);
@@ -3946,10 +3946,10 @@ mod tests {
         t.cmd(alice, "/setworth diamond 10");
         t.cmd(alice, "/setworth iron_ingot 1");
         t.host.p(alice).op = 0;
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.sell, essentials.sell.hand]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.sell, essentials.sell.hand]\n");
         give(&mut t, alice, 0, "diamond", 1);
         assert_eq!(t.cmd(alice, "/sell hand")[1], "Sold for $10 (1 diamond at $10 each).");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.sell, essentials.sell.hand]\nusers:\n  alice:\n    permissions: [essentials.sell.multiplier.vip]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.sell, essentials.sell.hand]\nusers:\n  alice:\n    permissions: [essentials.sell.multiplier.vip]\n");
         give(&mut t, alice, 0, "diamond", 1);
         assert_eq!(t.cmd(alice, "/sell hand")[1], "Sold for $25 (1 diamond at $25 each).");
         give(&mut t, alice, 1, "iron_ingot", 64);
@@ -3978,7 +3978,7 @@ mod tests {
     #[test]
     fn command_cost_exemption_per_command() {
         let mut t = TestServer::with_config("command-costs:\n  ping: 5");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.ping, essentials.nocommandcost.ping]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.ping, essentials.nocommandcost.ping]\n");
         let alice = join(&mut t, "Alice");
         assert_eq!(t.cmd(alice, "/ping"), ["Pong!"]);
     }
@@ -4020,7 +4020,7 @@ mod tests {
         let bob = join(&mut t, "Bob");
         let (r, l) = write_sign(&mut t, bob, [0, 64, 0], ["[Buy]", "1", "diamond", "10"]);
         assert_eq!((r, l[0].as_str()), (Allow::Yes, "[buy]"));
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.buy.create]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.signs.buy.create]\n");
         let (_, l) = write_sign(&mut t, bob, [0, 64, 0], ["[Buy]", "1", "diamond", "10"]);
         assert_eq!(l[0], "§1[Buy]");
     }
@@ -4051,7 +4051,7 @@ mod tests {
         assert_eq!(l[..2], ["§cHello", "§lbold"]);
         let (_, l) = write_sign(&mut t, bob, [0, 64, 0], ["&cHello", "plain & text", "", ""]);
         assert_eq!(l[..2], ["Hello", "plain & text"]);
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.color, -essentials.signs.red]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.signs.color, -essentials.signs.red]\n");
         let (_, l) = write_sign(&mut t, bob, [0, 64, 0], ["&aok &cno", "", "", ""]);
         assert_eq!(l[0], "§aok no");
     }
@@ -4070,7 +4070,7 @@ mod tests {
         // Default players may use every sign (essentials.signs.use.*).
         let bob = join(&mut t, "Bob");
         assert_eq!(click(&mut t, bob, [0, 64, 0]).1, ["Balance: $0"]);
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [-essentials.signs.use.balance]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, -essentials.signs.use.balance]\n");
         assert_eq!(click(&mut t, bob, [0, 64, 0]), (Allow::No, vec![]));
     }
 
@@ -4212,7 +4212,7 @@ mod tests {
         assert_eq!(t.host.p(alice).open.as_ref().unwrap().title, "Trash Can");
         // Without essentials.signs.disposal.name the custom lines are cleared.
         let bob = join(&mut t, "Bob");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.create.disposal, essentials.signs.use.*]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.signs.create.disposal, essentials.signs.use.*]\n");
         let (_, l) = write_sign(&mut t, bob, [4, 64, 0], ["[Disposal]", "Trash", "", ""]);
         assert_eq!(l, ["§1[Disposal]", "", "", ""]);
     }
@@ -4414,7 +4414,7 @@ mod tests {
         let mut t = signs_config("");
         let alice = join(&mut t, "Alice");
         let bob = join(&mut t, "Bob");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.signs.create.trade, essentials.signs.break.trade, essentials.signs.use.*]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.signs.create.trade, essentials.signs.break.trade, essentials.signs.use.*]\n");
         give(&mut t, alice, 0, "diamond", 5);
         let (r, l) = write_sign(&mut t, alice, [0, 64, 0], ["[Trade]", "10", "1 diamond 5", ""]);
         assert_eq!((r, l.clone()), (Allow::Yes, ["§1[Trade]", "$10:0", "1 diamond:5", "§8Alice"].map(String::from)));

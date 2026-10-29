@@ -457,10 +457,6 @@ pub trait Host {
     fn first_played(&mut self, player: Uuid) -> Option<i64> {
         None
     }
-    /// The player's Bukkit (fly, walk) speeds, for /whois.
-    fn speeds(&mut self, player: Uuid) -> (f32, f32) {
-        (0.1, 0.2)
-    }
     /// A line for the server log (EssentialsX's LOGGER.info: bans, kicks, jails, console commands).
     fn log(&mut self, text: &[Span]) {
         self.send(Sender::Console, text);
@@ -947,6 +943,8 @@ pub struct Ess {
     pub last_loc: HashMap<Uuid, Loc>,
     /// For join listeners: the player's account name before this join (None on a first join).
     pub previous_names: HashMap<Uuid, Option<String>>,
+    /// Players quitting while vanished, during their quit listeners.
+    pub quitting_vanished: Vec<Uuid>,
 }
 
 impl Ess {
@@ -980,6 +978,7 @@ impl Ess {
             state: HashMap::new(),
             last_loc: HashMap::new(),
             previous_names: HashMap::new(),
+            quitting_vanished: Vec::new(),
         };
         ess.reload();
         ess.users.index_names();
@@ -1189,7 +1188,7 @@ impl Ess {
         self.has(host, viewer, "essentials.vanish.see")
     }
     pub fn is_vanished(&mut self, player: Uuid) -> bool {
-        self.users.get(player).is_some_and(|u| u.bool("vanished"))
+        self.quitting_vanished.contains(&player) || self.users.get(player).is_some_and(|u| u.bool("vanished"))
     }
 
     // ----- Dispatch ---------------------------------------------------------------------------------------------------
@@ -1303,9 +1302,14 @@ impl Ess {
             self.users.user(player).set("logoutlocation", at.to_yaml());
         }
         self.users.user(player).set("timestamps.logout", json!(now));
+        // Whether the player left vanished holds for every quit listener, even after one un-vanishes them.
+        if self.is_vanished(player) {
+            self.quitting_vanished.push(player);
+        }
         for f in self.listeners.quit.clone() {
             f(self, host, player);
         }
+        self.quitting_vanished.retain(|p| *p != player);
         self.last_loc.remove(&player);
         self.users.save();
     }

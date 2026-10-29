@@ -1792,7 +1792,8 @@ fn cmd_whois(ctx: &mut Ctx, args: &[String]) -> CmdResult {
     let allow = tl_bool(ctx.ess, ctx.host.allow_flight(u));
     let state = ctx.ess.tl(if flying { "flying" } else { "notFlying" }, &[]);
     ctx.tl("whoisFly", &[allow, Arg::Parsed(state)]);
-    let (fly, walk) = ctx.host.speeds(u);
+    // Host::speeds is (walk, fly) (the world area owns speeds).
+    let (walk, fly) = ctx.host.speeds(u);
     ctx.tl("whoisSpeed", &[Arg::Plain(format_number(f64::from(if flying { fly } else { walk }), 3))]);
     let white = tl_bool(ctx.ess, ctx.host.whitelisted(u));
     ctx.tl("whoisWhitelist", &[white]);
@@ -2909,9 +2910,10 @@ mod tests {
         assert!(t.said(bob).is_empty());
         t.tick(1);
         assert_eq!(t.said(bob), ["Pong!"]);
-        t.console("sudo Bob time set day");
+        // A vanilla command Essentials doesn't own (/time is Essentials' own since the world area).
+        t.console("sudo Bob seed");
         t.tick(1);
-        assert_eq!(t.host.player_commands, [(bob, "time set day".to_string(), false)]);
+        assert_eq!(t.host.player_commands, [(bob, "seed".to_string(), false)]);
         t.console("sudo Bob c:hello there");
         assert_eq!(t.host.chats.last().unwrap(), &(bob, "<Bob> hello there".to_string()));
         // Self is silently skipped.
@@ -3329,7 +3331,7 @@ mod tests {
     #[test]
     fn jail_allow_nodes_and_exempt() {
         let (mut t, _alice, bob, _cell) = jail_server("");
-        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.ping, essentials.jail.allow.ping, essentials.jail.allow-break]\n");
+        t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.build, essentials.ping, essentials.jail.allow.ping, essentials.jail.allow-break]\n");
         t.console("jail Bob cell");
         t.said(bob);
         assert_eq!(t.cmd(bob, "/ping"), ["Pong!"]);

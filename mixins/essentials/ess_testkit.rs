@@ -634,9 +634,6 @@ mod kit {
         fn first_played(&mut self, player: Uuid) -> Option<i64> {
             self.first_played.get(&player).copied()
         }
-        fn speeds(&mut self, player: Uuid) -> (f32, f32) {
-            self.players.get(&player).map_or((0.1, 0.2), |p| (p.fly_speed, p.walk_speed))
-        }
         fn log(&mut self, text: &[Span]) {
             self.logs.push(plain(text));
         }
@@ -685,6 +682,11 @@ mod kit {
 
     static NEXT_DIR: AtomicU64 = AtomicU64::new(0);
 
+    /// Config every test server starts from, over EssentialsX's defaults: no first-join welcome, spawnpoint
+    /// teleport or kit, which would reach every test's players two ticks after they join. Tests of the Spawn
+    /// module turn them on in their own config (they are EssentialsX's defaults on a real server).
+    pub const TEST_BASELINE: &str = "newbies:\n  announce-format: ''\n  spawnpoint: none\n  kit: ''\n";
+
     /// Essentials over a FakeHost, in a scratch server folder removed on drop.
     pub struct TestServer {
         pub ess: Ess,
@@ -705,12 +707,14 @@ mod kit {
             let _ = std::fs::remove_dir_all(&dir);
             let data = dir.join("essentials");
             std::fs::create_dir_all(&data).expect("scratch folder");
+            // EssentialsX's defaults, then the test baseline, then the test's own lines.
+            let mut base = crate::game::ess_yaml::parse(crate::game::ess_defaults::file("config.yml").unwrap_or("")).unwrap_or_default();
+            merge(&mut base, crate::game::ess_yaml::parse(TEST_BASELINE).expect("baseline is YAML"));
             if !config.is_empty() {
-                let mut base = crate::game::ess_yaml::parse(crate::game::ess_defaults::file("config.yml").unwrap_or("")).unwrap_or_default();
                 let over = crate::game::ess_yaml::parse(config).expect("test config is YAML");
                 merge(&mut base, over);
-                std::fs::write(data.join("config.yml"), crate::game::ess_yaml::to_string(&base)).expect("config.yml");
             }
+            std::fs::write(data.join("config.yml"), crate::game::ess_yaml::to_string(&base)).expect("config.yml");
             let host = FakeHost::new(dir.clone());
             let ess = Ess::new(&data);
             TestServer { ess, host, dir }

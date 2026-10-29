@@ -3276,7 +3276,8 @@ mod tests {
 
     #[test]
     fn newbies_spawnpoint_and_announcement() {
-        let mut t = TestServer::new();
+        // EssentialsX's defaults (the test kit's baseline turns newbies off).
+        let mut t = TestServer::with_config("newbies:\n  announce-format: '&dWelcome {DISPLAYNAME}&d to the server!'\n  spawnpoint: newbies\n");
         let a = joined(&mut t, "Alice");
         t.op("Alice");
         at(&mut t, a, OW, 70.5, 64.0, 70.5);
