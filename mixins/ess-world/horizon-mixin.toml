@@ -46,3 +46,58 @@ name = "ess_protect"
 source = "ess_protect.rs"
 
 # This area's injections go below ([[injection]] entries with helpers in this folder).
+
+# The area's per-tick glue, after the core's tick hook.
+[[injection]]
+id = "world-tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "hook_world_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+# keepinv / keepxp before a guest's drops: guest_die (which has macros) first calls guest_forget_digging for a
+# dying guest, before anything drops.
+[[injection]]
+id = "death"
+kind = "HEAD"
+target = "horizon_client::game::lan_actions::Game<'_>::guest_forget_digging"
+helper = "hook_world_death.rs"
+bindings = [
+  { name = "host", ty = "&mut LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+]
+
+# Survival flight: the abilities a fly-enabled player is told, and their own flight toggles.
+[[injection]]
+id = "fly-flags"
+kind = "RETURN"
+target = "horizon_client::lan::guest::Guest::ability_flags"
+helper = "hook_fly_flags.rs"
+bindings = [
+  { name = "guest", ty = "&Guest", value = "&self" },
+  { name = "value", ty = "i8", value = "$value" },
+]
+
+[[injection]]
+id = "fly-inbox"
+kind = "HEAD"
+target = "horizon_client::lan::hub::Hub::tick_level"
+helper = "hook_fly_inbox.rs"
+bindings = [
+  { name = "hub", ty = "&mut Hub", value = "&mut *self" },
+]
+
+# God mode and Protect's damage rules: every hurt of a player.
+[[injection]]
+id = "god"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::health::PlayerMotion::hurt_caused_by"
+helper = "hook_god.rs"
+bindings = [
+  { name = "motion", ty = "&mut PlayerMotion", value = "&mut *self" },
+  { name = "resources", ty = "&HealthResources", value = "resources" },
+  { name = "source", ty = "&DamageTypeId", value = "&source" },
+]
