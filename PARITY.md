@@ -243,56 +243,56 @@ Generated once by tools/parity_table.py from plugin.yml; each area keeps its own
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /antioch | core | grenade, tnt | todo | |
-| /beezooka | core | beecannon | todo | |
-| /bigtree | core | largetree | todo | |
-| /break | core |  | todo | |
-| /burn | core |  | todo | |
-| /editsign | core | sign | todo | |
-| /ext | core | extinguish | todo | |
-| /feed | core | eat | todo | |
-| /fireball | core | fireentity, fireskull | todo | |
-| /fly | core |  | todo | |
-| /gamemode | core | adventure, adventuremode, creative, creativemode, gm, gma, gmc, gms, gmt, survival, survivalmode, gmsp, sp, spec, spectator | todo | |
-| /god | core | godmode, tgm | todo | |
-| /heal | core |  | todo | |
-| /ice | core | efreeze | todo | |
-| /kittycannon | core |  | todo | |
-| /lightning | core | shock, smite, strike, thor | todo | |
-| /nuke | core |  | todo | |
-| /ptime | core | playertime | todo | |
-| /pweather | core | playerweather | todo | |
-| /remove | core | butcher, killall, mobkill | todo | |
-| /rest | core |  | todo | |
-| /spawner | core | changems, mobspawner | todo | |
-| /spawnmob | core | mob, spawnentity | todo | |
-| /speed | core | flyspeed, fspeed, walkspeed, wspeed | todo | |
-| /suicide | core |  | todo | |
-| /thunder | core |  | todo | |
-| /time | core | day, night | todo | |
-| /tree | core |  | todo | |
-| /weather | core | rain, sky, storm, sun | todo | |
-| /discord | discord |  | todo | |
-| /discordbroadcast | discord | dbroadcast, dbc, dbcast | todo | |
-| /link | discordlink | discordlink | todo | |
-| /unlink | discordlink | discordunlink | todo | |
-| /setxmpp | xmpp |  | todo | |
-| /xmpp | xmpp |  | todo | |
-| /xmppspy | xmpp |  | todo | |
+| /antioch | core | grenade, tnt | done | Primed TNT at the target block; with an argument the two broadcast lines. |
+| /beezooka | core | beecannon | partial | Bee launched from the eyes (Motion NBT); after 20 ticks a zero-radius creeper explosion at it, then the bee is removed with /kill (death animation, unlike Bukkit remove()). |
+| /bigtree | core | largetree | done | tree/redwood/jungle/darkoak -> vanilla configured features via `place feature`; solid target -> bigTreeFailure. |
+| /break | core |  | done | Target block (20) to air; bedrock needs essentials.break.bedrock; block_break listeners (AntiBuild) may veto. |
+| /burn | core |  | done |  |
+| /editsign | core | sign | done | set/clear/copy/paste, line numbers, 15-char limit (editsign.unlimited), & codes per editsign.color/format/magic, sign_change listeners. Front side only; waxed signs not detected. |
+| /ext | core | extinguish | done |  |
+| /feed | core | eat | done | Shares the heal cooldown (timestamps.last-heal). L3 world_player. |
+| /fireball | core | fireentity, fireskull | partial | All 13 types with essentials.fireball.<type>, speed capped by max-projectile-speed, Motion/Owner NBT; `ride` uses vanilla /ride (unverified in Horizon). |
+| /fly | core |  | done | Toggle/others/on-off, flymode userdata; survival flight via the abilities flags and the client toggles (hooks on Guest::ability_flags, Hub::tick_level). L3 checks messages only (ess-bot cannot read abilities). |
+| /gamemode | core | adventure, adventuremode, creative, creativemode, gm, gma, gmc, gms, gmt, survival, survivalmode, gmsp, sp, spec, spectator | done | All labels (gmc/gms/gma/gmsp/gmt...), per-mode permissions, others, toggle. L3 world_player (execute if entity). |
+| /god | core | godmode, tgm | done | godmode userdata, heal on enable, no damage (cancellable HEAD on PlayerMotion::hurt_caused_by; L3: survives lava), no hunger, no-god-in-worlds, remove-god-on-disconnect. God attacker vs essentials.god.pvp: L1 only (no attacker in the hook). |
+| /heal | core |  | done | heal-cooldown + essentials.heal.cooldown.bypass, remove-effects-on-heal (effect clear), healDead. Remaining air not reset. L3 world_player. |
+| /ice | core | efreeze | done | Freeze ticks 140. |
+| /kittycannon | core |  | partial | Baby tamed cat (random variant) launched; zero-radius explosion after 20 ticks, removal via /kill. |
+| /lightning | core | shock, smite, strike, thor | partial | Strike at target / smite players (effect-only bolt + vanilla /damage with power, god exempt, warn-on-smite). In another dimension the bolt is a real /summon lightning_bolt. |
+| /nuke | core |  | done | 25 primed TNT 64 blocks above each target. |
+| /ptime | core | playertime | done | Relative and @fixed, get/list/reset, others; per-player SetTime clock packets, refreshed every second. |
+| /pweather | core | playerweather | done | storm/sun/reset, get, others; per-player rain game events, refreshed every second. |
+| /remove | core | butcher, killall, mobkill | partial | All ToRemove kinds, custom mob names, radius, world; done with vanilla /kill per type (drops loot, unlike Bukkit remove()); tamed/named mobs are not skipped in the game (L1 only). |
+| /rest | core |  | done | Resets minecraft:custom/minecraft:time_since_rest. |
+| /spawner | core | changems, mobspawner | done | Spawner target, mob permissions, protect prevent-spawn, essentials.spawner.delay; via data merge block. |
+| /spawnmob | core | mob, spawnentity | partial | Names/suffixes, counts, spawnmob-limit, stacking (Passengers), per-mob permissions, protect prevent-spawn, target player; MobData subset (baby/adult, colors, tame, saddle, angry, charged, sizes, villager profession/type, cat/parrot/horse variants, swords, armor). Rarer data ignored. |
+| /speed | core | flyspeed, fspeed, walkspeed, wspeed | done | walk/fly, labels, caps (max-walk-speed/max-fly-speed, speed.bypass), speed.fly/walk, others. Walk via the movement_speed base, fly via the abilities packet. |
+| /suicide | core |  | done | Health 0, suicideMessage, suicideSuccess broadcast. |
+| /thunder | core |  | done |  |
+| /time | core | day, night | done | Show/set/add, day/night labels, worlds/all, time.set, world-time-permissions, DescParseTickFormat; relative ptimes kept. L3 world_player. |
+| /tree | core |  | done | Every TreeType name -> vanilla configured feature via `place feature`. |
+| /weather | core | rain, sky, storm, sun | done | Player and console forms, durations. L3 world_player. |
+| /discord | discord |  | done | Invite link from discord-url. |
+| /discordbroadcast | discord | dbroadcast, dbc, dbcast | done | Channel by name or id, per-channel/markdown/ping permissions, REST post. |
+| /link | discordlink | discordlink | done | In-game code; on Discord the message command "/link CODE" in a mapped channel (deleted after use). |
+| /unlink | discordlink | discordunlink | done | Also the "/unlink" message command; unsyncs roles and groups. |
+| /setxmpp | xmpp |  | done | Stores the address in xmpp/users.yml; players only. |
+| /xmpp | xmpp |  | done | Sends through the XMPP client; "Error sending message." when not connected. |
+| /xmppspy | xmpp |  | done | Toggles spy; * / ** / @s. |
 
 **Features (world)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| god mode (no damage, no hunger) | todo | |
-| fly: persistence, safelogin, world-change reset | todo | |
-| speed caps (max-walk-speed, max-fly-speed) | todo | |
-| death: vanishing/binding items policy, keepinv, keepxp | todo | |
-| Protect module: fire, lava, explosions, mob spawns, damage types | todo | |
-| AntiBuild module: build/break/use/drop/pickup permissions, blacklists, alerts | todo | |
-| GeoIP: database, join message, whois line | todo | |
-| Discord: chat both ways, events, console relay, commands | todo | |
-| DiscordLink: link codes, role sync, unlinked kick | todo | |
-| XMPP bridge | todo | |
+| god mode (no damage, no hunger) | done | Damage hook on PlayerMotion::hurt_caused_by (L3 lava), hunger refilled each tick. Attacker-side god.pvp rule is L1 only. |
+| fly: persistence, safelogin, world-change reset | done | flymode restored on join, fly.safelogin (shouldFly), send-fly-enable-on-join, world-change-fly-reset, world-change-preserve-flying, gamemode-change-preserve-flying. |
+| speed caps (max-walk-speed, max-fly-speed) | done | Caps in /speed, reset on join without essentials.speed, world-change-speed-reset. |
+| death: vanishing/binding items policy, keepinv, keepxp | partial | L1 complete; in game a HEAD hook on guest_forget_digging (first macro-free call in guest_die) keeps inventory/xp until respawn using rules cached every second; not L3-tested. |
+| Protect module: fire, lava, explosions, mob spawns, damage types | partial | Every prevent/disable rule decided in L1 (damage, world events, weather, spawn, transformations, entity target, pistons/dispensers). In game only player damage is enforced (per vanilla damage type, mirrored onto the body each second); world events (fire, flow, explosions, spawns) have no Horizon hook yet; PvP rules need the attacker (CORE-REQUESTS 3). |
+| AntiBuild module: build/break/use/drop/pickup permissions, blacklists, alerts | partial | All rules in L1 (place/break/interact, attached signs, drop/pickup/craft, blacklists, alerts). In game only /break emits block_break; place/interact/drop/pickup need core events (CORE-REQUESTS 1, 2). |
+| GeoIP: database, join message, whois line | partial | Own .mmdb reader (record sizes 24/28/32), join message, whois_line for admin. Auto-download impossible (binary .tar.gz over a text Host HTTP API): place the .mmdb in essentials/geoip/. Off and silent without a database. |
+| Discord: chat both ways, events, console relay, commands | partial | REST only: MC->Discord chat/join/quit/death/start (webhooks for name/avatar), Discord->MC polling, message commands execute/msg/list, console command relay. No gateway (presence, slash commands), no console log relay; afk/kick/mute/me/msg/advancement relays need other areas to call the hooks. Not verified against real Discord. |
+| DiscordLink: link codes, role sync, unlinked kick | partial | Link codes, accounts.json, kick (just after join) / freeze policies, block-unlinked-chat, mail DMs, role<->group sync via REST + permissions.yml. No member-leave events (gateway). |
+| XMPP bridge | partial | Own client (SASL PLAIN or iq:auth, bind, session, presence, chat relay, op-user commands) over plain TCP. No STARTTLS (horizon-client has no TLS socket API), so TLS-only servers are refused with a logged reason; no log forwarding. |
 
 Total: 163 commands.
