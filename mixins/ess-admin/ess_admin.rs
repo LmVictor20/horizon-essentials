@@ -2516,8 +2516,22 @@ mod tests {
     const DAY: i64 = 24 * HOUR;
     const PLAY: &str = "minecraft:custom/minecraft:play_time";
 
+    /// A server without the Spawn module's first-join welcome (tp area), which these line-counting tests
+    /// would otherwise receive two ticks after each join.
+    fn quiet_server() -> TestServer {
+        quiet_with(QUIET)
+    }
+
+    /// In config.yml itself, so reloads (permissions changes) keep it.
+    /// Also no newbie spawnpoint teleport: it moves a first-time player to spawn two ticks after joining.
+    const QUIET: &str = "newbies:\n  announce-format: ''\n  spawnpoint: none\n";
+
+    fn quiet_with(config: &str) -> TestServer {
+        TestServer::with_config(config)
+    }
+
     fn server() -> (TestServer, Uuid, Uuid) {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         let alice = t.join("Alice");
         t.op("Alice");
         let bob = t.join("Bob");
@@ -2572,7 +2586,7 @@ mod tests {
 
     #[test]
     fn date_diffs_format_like_essentials() {
-        let t = TestServer::new();
+        let t = quiet_server();
         let f = |d: i64| format_date_diff(&t.ess, NOW, d);
         assert_eq!(f(NOW), "now");
         assert_eq!(f(NOW + DAY), "1 day");
@@ -2589,7 +2603,7 @@ mod tests {
 
     #[test]
     fn permissions_groups_inheritance_wildcards_and_negation() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions(
             "groups:\n  Default:\n    default: true\n    prefix: '&7'\n    permissions: [essentials.seen, essentials.list]\n  mod:\n    inherits: [default]\n    prefix: '&9[Mod] '\n    suffix: '!'\n    permissions: ['essentials.kick', 'essentials.jail.*', -essentials.list]\n  admin:\n    inherits: [mod]\n    permissions: ['*', -essentials.ban.exempt]\n  loop1:\n    inherits: [loop2]\n    permissions: [a.b]\n  loop2:\n    inherits: [loop1]\nusers:\n  carol:\n    groups: [mod]\n    permissions: [essentials.fly]\n  DAVE:\n    groups: [admin]\n  erin:\n    groups: [loop1]\n",
         );
@@ -2628,7 +2642,7 @@ mod tests {
 
     #[test]
     fn permissions_fall_back_to_plugin_yml_defaults_by_op() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions("groups: {}\n");
         let alice = t.join("Alice");
         let bob = t.join("Bob");
@@ -2647,7 +2661,7 @@ mod tests {
 
     #[test]
     fn permissions_users_by_uuid_and_essentials_reload() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         let bob = t.join("Bob");
         assert!(!t.ess.has(&mut t.host, Sender::Player(bob), "essentials.kick"));
         std::fs::write(
@@ -2770,7 +2784,7 @@ mod tests {
 
     #[test]
     fn tempban_offline_needs_the_node() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.tempban]\n");
         let carol = t.join("Carol");
         let bob = t.join("Bob");
@@ -2949,7 +2963,7 @@ mod tests {
 
     #[test]
     fn vanish_without_others_node_toggles_self() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.vanish]\n");
         let bob = t.join("Bob");
         t.join("Carol");
@@ -3115,7 +3129,7 @@ mod tests {
 
     #[test]
     fn whois_without_ip_node_hides_the_address() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.whois]\n");
         let bob = t.join("Bob");
         let lines = t.cmd(bob, "/whois Bob");
@@ -3228,7 +3242,7 @@ mod tests {
 
     #[test]
     fn invsee_without_modify_is_read_only() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.invsee]\n");
         let carol = t.join("Carol");
         let bob = t.join("Bob");
@@ -3245,7 +3259,7 @@ mod tests {
     // ----- Jails ---------------------------------------------------------------------------------------------------
 
     fn jail_server(config: &str) -> (TestServer, Uuid, Uuid, Loc) {
-        let mut t = TestServer::with_config(config);
+        let mut t = quiet_with(&format!("{QUIET}{config}"));
         let alice = t.join("Alice");
         t.op("Alice");
         let bob = t.join("Bob");
@@ -3298,7 +3312,8 @@ mod tests {
         assert_eq!(t.ess.on_interact(&mut t.host, bob, None, None), Allow::No);
         assert_eq!(t.ess.on_block_break(&mut t.host, alice, "minecraft:overworld", [0, 63, 0], "minecraft:stone"), Allow::Yes);
         assert_eq!(t.ess.on_respawn(&mut t.host, bob), Some(cell.clone()));
-        assert_eq!(t.ess.on_respawn(&mut t.host, alice), None);
+        // Not jailed: the Spawn module (tp area) may send Alice to spawn, never to the cell.
+        assert_ne!(t.ess.on_respawn(&mut t.host, alice), Some(cell.clone()));
         // Already jailed elsewhere.
         assert_eq!(t.console("jail Bob other"), ["Person is already in jail: cell"]);
         // Release.
@@ -3436,7 +3451,7 @@ mod tests {
 
     #[test]
     fn console_commands_are_logged() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         t.console("ping hi");
         assert_eq!(logs(&mut t), ["CONSOLE issued server command: /ping hi"]);
         let mut t = TestServer::with_config("log-console-commands: false");
@@ -3489,7 +3504,7 @@ mod tests {
 
     #[test]
     fn backup_runs_the_configured_command() {
-        let mut t = TestServer::new();
+        let mut t = quiet_server();
         assert_eq!(t.console("backup"), ["Error: An external backup script has not been configured."]);
         let mut t = TestServer::with_config("backup:\n  command: 'save-all'\n");
         assert_eq!(t.console("backup"), ["Error: An external backup script has not been configured."]);
