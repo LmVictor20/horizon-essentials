@@ -21,3 +21,65 @@ name = "ess_glue_economy"
 source = "ess_glue_economy.rs"
 
 # This area's injections go below ([[injection]] entries with helpers in this folder).
+# Horizon's packet handler and sign update hold macros (unhookable): see ess_glue_economy.rs for the routes.
+
+# A right click on a sign with text (interact listeners); an Essentials sign keeps its editor shut.
+[[injection]]
+id = "open-sign-editor"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::sign_edit::Game<'_>::lan_open_sign_editor"
+helper = "hook_open_sign_editor.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "edit", ty = "&crate::game::sign_edit::SignEditor", value = "&edit" },
+]
+
+# Opening a container block (interact listeners: [Protection]).
+[[injection]]
+id = "open-container"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::lan_open_container"
+helper = "hook_open_container.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "pos", ty = "(i32, i32, i32)", value = "pos" },
+]
+
+# A block entity changed: finished sign edits (sign_change listeners, next tick).
+[[injection]]
+id = "block-entity-updated"
+kind = "HEAD"
+target = "horizon_client::game::trial_spawner::Game<'_>::mark_block_entity_updated"
+helper = "hook_block_entity_updated.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "(i32, i32, i32)", value = "key" },
+]
+
+# A player breaks a block (block_break listeners; Break keeps it).
+[[injection]]
+id = "break-block"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::Game<'_>::break_block_as_player"
+helper = "hook_break.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "pos", ty = "[i32; 3]", value = "pos" },
+]
+
+# Once per tick, after the core's hook (mod ids order same-priority hooks).
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "hook_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]

@@ -3003,9 +3003,19 @@ fn trade_break(cx: &mut SignCx) -> Result<bool, CmdError> {
         cx.log("Trade", "Destroy", Some(&stored2), Some(&stored1));
         return Ok(true);
     }
-    stored1.pay(cx.ess, cx.host, cx.player, Overflow::Drop)?;
-    stored2.pay(cx.ess, cx.host, cx.player, Overflow::Drop)?;
     cx.log("Trade", "Break", Some(&stored2), Some(&stored1));
+    // The stock is handed over on the next tick: a break may be decided while the player can't be reached.
+    let player = cx.player;
+    cx.ess.scheduler.later(
+        0,
+        Box::new(move |ess, host| {
+            for stored in [stored1, stored2] {
+                if let Err(e) = stored.pay(ess, host, player, Overflow::Drop) {
+                    show_error(ess, host, Sender::Player(player), e);
+                }
+            }
+        }),
+    );
     Ok(true)
 }
 
@@ -3201,6 +3211,14 @@ fn on_sign_change(ess: &mut Ess, host: &mut dyn Host, player: Uuid, world: &str,
 
 /// SignPlayerListener.onSignPlayerInteract: a right click on an Essentials sign uses it (and never edits it);
 /// on a guarded block, the [Protection] rules apply.
+/// Whether a sign's first line makes it an enabled Essentials sign (`§1[Buy]`): its right clicks are
+/// Essentials' and it never opens its editor.
+pub fn is_essentials_sign(ess: &Ess, first_line: &str) -> bool {
+    let (kinds, on) = enabled_signs(ess);
+    let line = clean_line(first_line).to_lowercase();
+    on && kinds.into_iter().any(|k| line == success_name(ess, k).to_lowercase())
+}
+
 fn on_interact(ess: &mut Ess, host: &mut dyn Host, player: Uuid, block: Option<(&str, [i32; 3], &str)>, _held: Option<&Item>) -> Allow {
     let (kinds, on) = enabled_signs(ess);
     let Some((world, pos, state)) = block.filter(|_| on) else { return Allow::Yes };
@@ -4416,7 +4434,8 @@ mod tests {
         // Others may not break it; the owner gets the stock back.
         assert_eq!(break_at(&mut t, bob, [0, 64, 0]).0, Allow::No);
         assert_eq!(break_at(&mut t, alice, [0, 64, 0]).0, Allow::Yes);
-        assert_eq!(count(&mut t, alice, "diamond"), 7);
+        t.tick(1);
+        assert_eq!(count(&mut t, alice, "diamond"), 7, "the stock comes back on the next tick");
         // Nothing left for a buyer.
         write_sign(&mut t, alice, [2, 64, 0], ["[Trade]", "10", "1 diamond 1", ""]);
         click(&mut t, bob, [2, 64, 0]);
@@ -4467,5 +4486,16 @@ mod tests {
         // A name on line 2 or 3 lets that player in.
         write_sign(&mut t, alice, [1, 64, 0], ["[Protection]", "Bob", "", ""]);
         assert_eq!(click(&mut t, bob, chest).0, Allow::Yes);
+    }
+
+    #[test]
+    fn essentials_signs_are_recognized_by_their_first_line() {
+        let t = signs_config("");
+        assert!(is_essentials_sign(&t.ess, "§1[Buy]"));
+        assert!(is_essentials_sign(&t.ess, "§1[buy]"));
+        assert!(!is_essentials_sign(&t.ess, "[Buy]"));
+        assert!(!is_essentials_sign(&t.ess, "§4[Buy]"));
+        let t = TestServer::new();
+        assert!(!is_essentials_sign(&t.ess, "§1[Buy]"), "no signs enabled");
     }
 }
