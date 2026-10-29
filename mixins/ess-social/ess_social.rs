@@ -602,6 +602,11 @@ fn ignores(ess: &mut Ess, host: &mut dyn Host, by: Uuid, who: Uuid) -> bool {
     ignore_list(ess, by).contains(&uuid_string(who)) && !ess.has(host, Sender::Player(who), "essentials.chat.ignoreexempt")
 }
 
+/// For other areas (tpa requests): whether `by` ignores `who`.
+pub fn ignores_player(ess: &mut Ess, host: &mut dyn Host, by: Uuid, who: Uuid) -> bool {
+    ignores(ess, host, by, who)
+}
+
 pub fn is_muted(ess: &mut Ess, u: Uuid) -> bool {
     user_bool(ess, u, "muted")
 }
