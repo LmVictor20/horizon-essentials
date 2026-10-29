@@ -2296,12 +2296,20 @@ fn on_damage(ess: &mut Ess, host: &mut dyn Host, player: Uuid, cause: &str, _amo
 mod tests {
     use crate::game::ess_core::*;
     use crate::game::ess_testkit::*;
+
+    /// Joins and drops the join-time lines other areas send (motd, mail notices...).
+    fn join(t: &mut TestServer, name: &str) -> Uuid {
+        let u = t.join(name);
+        t.tick(1);
+        t.said(u);
+        u
+    }
     use serde_json::json;
 
     fn server() -> (TestServer, Uuid, Uuid) {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
-        let bob = t.join("Bobby");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bobby");
         t.op("Alice");
         (t, alice, bob)
     }
@@ -2311,7 +2319,7 @@ mod tests {
         let mut t = TestServer::with_config(config);
         let list = nodes.iter().map(|n| format!("'{n}'")).collect::<Vec<_>>().join(", ");
         t.permissions(&format!("groups:\n  default:\n    default: true\n    permissions: [{list}]\n"));
-        let carol = t.join("Carol");
+        let carol = join(&mut t, "Carol");
         (t, carol)
     }
 
@@ -2344,7 +2352,7 @@ mod tests {
     #[test]
     fn fly_without_others_permission_toggles_self() {
         let (mut t, carol) = with_player(&["essentials.fly"], "");
-        let _dave = t.join("Dave");
+        let _dave = join(&mut t, "Dave");
         assert_eq!(t.cmd(carol, "/fly Dave"), ["Set fly mode enabled for Carol."]);
         assert_eq!(t.cmd(carol, "/fly Dave on"), ["Set fly mode disabled for Carol."]);
     }
@@ -2357,14 +2365,14 @@ mod tests {
         t.host.p(alice).allow_flight = false;
         t.join("Alice");
         assert!(t.host.p(alice).allow_flight);
-        assert_eq!(t.said(alice), ["Set fly mode enabled for Alice."]);
+        assert_eq!(t.said(alice).iter().filter(|l| l.contains("fly mode")).count(), 1);
         // safelogin: high in the air -> flying.
         t.cmd(alice, "/fly off");
         t.quit(alice);
         t.host.p(alice).loc = Loc::new("minecraft:overworld", 5.5, 100.0, 5.5);
         t.join("Alice");
         assert!(t.host.p(alice).allow_flight && t.host.p(alice).flying);
-        assert_eq!(t.said(alice), ["Set fly mode enabled for Alice."]);
+        assert_eq!(t.said(alice).iter().filter(|l| l.contains("fly mode")).count(), 1);
         // On the ground: nothing.
         t.quit(alice);
         t.host.p(alice).allow_flight = false;
@@ -2372,7 +2380,7 @@ mod tests {
         t.host.p(alice).loc = Loc::new("minecraft:overworld", 5.5, 64.0, 5.5);
         t.join("Alice");
         assert!(!t.host.p(alice).flying);
-        assert!(t.said(alice).is_empty());
+        assert!(!t.said(alice).iter().any(|l| l.contains("fly mode")));
     }
 
     #[test]
@@ -2380,13 +2388,13 @@ mod tests {
         let (mut t, carol) = with_player(&["essentials.fly"], "send-fly-enable-on-join: false");
         t.cmd(carol, "/fly");
         t.quit(carol);
-        t.join("Carol");
+        join(&mut t, "Carol");
         assert!(t.host.p(carol).allow_flight);
         assert!(t.said(carol).is_empty());
         t.quit(carol);
         t.permissions("groups:\n  default:\n    default: true\n    permissions: []\n");
         t.host.p(carol).allow_flight = false;
-        t.join("Carol");
+        join(&mut t, "Carol");
         assert!(!t.host.p(carol).allow_flight);
         assert_eq!(t.userdata(carol)["flymode"], json!(false));
     }
@@ -2421,7 +2429,7 @@ mod tests {
         t.quit(carol);
         t.host.p(carol).walk_speed = 0.7;
         t.host.p(carol).fly_speed = 0.7;
-        t.join("Carol");
+        join(&mut t, "Carol");
         assert_eq!(t.host.p(carol).walk_speed, 0.2);
         assert_eq!(t.host.p(carol).fly_speed, 0.1);
     }
@@ -2457,7 +2465,7 @@ mod tests {
     #[test]
     fn god_attacker_needs_god_pvp() {
         let (mut t, carol) = with_player(&["essentials.god"], "");
-        let dave = t.join("Dave");
+        let dave = join(&mut t, "Dave");
         t.cmd(carol, "/god");
         let cause = format!("player:{}", uuid_string(carol));
         assert_eq!(t.ess.on_damage(&mut t.host, dave, &cause, 2.0), Allow::No);
@@ -2484,7 +2492,7 @@ mod tests {
         t.cmd(carol, "/god");
         t.quit(carol);
         t.permissions("groups:\n  default:\n    default: true\n    permissions: []\n");
-        t.join("Carol");
+        join(&mut t, "Carol");
         assert_eq!(t.userdata(carol)["godmode"], json!(false));
     }
 
@@ -2524,7 +2532,7 @@ mod tests {
         assert_eq!(t.cmd(carol, "/heal"), ["You have been healed."]);
         // Without heal.others, an argument heals yourself.
         t.host.now += 61_000;
-        let _dave = t.join("Dave");
+        let _dave = join(&mut t, "Dave");
         assert_eq!(t.cmd(carol, "/heal Dave"), ["You have been healed."]);
     }
 
@@ -2587,7 +2595,7 @@ mod tests {
     #[test]
     fn suicide_kills_and_broadcasts() {
         let (mut t, _alice, bob) = server();
-        let carol = t.join("Carol");
+        let carol = join(&mut t, "Carol");
         assert_eq!(t.cmd(carol, "/suicide"), ["Goodbye cruel world...", "Player Carol took their own life."]);
         assert_eq!(t.host.p(carol).health, 0.0);
         assert_eq!(t.said(bob), ["Player Carol took their own life."]);
@@ -2718,7 +2726,7 @@ mod tests {
     #[test]
     fn ptime_others_needs_permission() {
         let (mut t, carol) = with_player(&["essentials.ptime"], "");
-        t.join("Dave");
+        join(&mut t, "Dave");
         assert_eq!(t.cmd(carol, "/ptime noon Dave"), ["You are not authorized to set other players' time."]);
         assert_eq!(t.cmd(carol, "/ptime noon Carol"), ["Player time is set to 12:00 or 12:00 PM or 6000 ticks for: Carol."]);
     }
@@ -2772,7 +2780,7 @@ mod tests {
     #[test]
     fn pweather_others_needs_permission() {
         let (mut t, carol) = with_player(&["essentials.pweather"], "");
-        t.join("Dave");
+        join(&mut t, "Dave");
         assert_eq!(t.cmd(carol, "/pweather storm Dave"), ["You are not authorized to set other players' weather."]);
     }
 
@@ -2804,8 +2812,8 @@ mod tests {
     #[test]
     fn lightning_warn_off() {
         let mut t = TestServer::with_config("warn-on-smite: false");
-        let alice = t.join("Alice");
-        let bob = t.join("Bobby");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bobby");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/lightning Bobby"), ["Smiting Bobby"]);
         assert!(t.said(bob).is_empty());

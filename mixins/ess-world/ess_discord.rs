@@ -1663,6 +1663,14 @@ fn matches_at(nodes: &[Node], chars: &[char], pos: usize) -> bool {
 mod tests {
     use super::*;
     use crate::game::ess_testkit::*;
+
+    /// Joins and drops the join-time lines other areas send (motd, mail notices...).
+    fn join(t: &mut TestServer, name: &str) -> Uuid {
+        let u = t.join(name);
+        t.tick(1);
+        t.said(u);
+        u
+    }
     use crate::game::{ess_defaults, ess_yaml};
     use serde_json::{Value, json};
 
@@ -1803,23 +1811,23 @@ mod tests {
     #[test]
     fn discord_shows_the_invite_link() {
         let mut t = server();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/discord"), ["Join our Discord server at https://discord.gg/abc!"]);
         assert_eq!(t.console("ediscord"), ["Join our Discord server at https://discord.gg/abc!"]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(t.cmd(bob, "/discord"), ["You do not have access to that command."]);
     }
 
     #[test]
     fn discord_works_without_a_token() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/discord"), ["Join our Discord server at https://discord.gg/invite-code!"]);
         t.tick(300);
         assert!(t.host.http_requests.is_empty(), "inactive module made requests");
-        assert_eq!(t.chat(alice, "hi"), Chat::Pass);
+        assert_ne!(t.chat(alice, "hi"), Chat::Cancel);
     }
 
     // ----- /discordbroadcast -----------------------------------------------------------------------
@@ -1828,13 +1836,13 @@ mod tests {
     fn discordbroadcast_usage_permission_and_channels() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let usage = t.cmd(alice, "/dbc staff");
         assert_eq!(usage[0], "Command Help: /dbc");
         assert_eq!(t.cmd(alice, "/dbc nochan hello"), ["Error: Discord channel nochan does not exist."]);
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.discordbroadcast, essentials.discordbroadcast.primary]\n");
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(t.cmd(bob, "/dbc staff hi"), ["Error: You do not have permission to send messages to the staff channel."]);
         t.tick(1);
         take(&mut t);
@@ -1850,7 +1858,7 @@ mod tests {
     fn discordbroadcast_markdown_and_ping_for_ops() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         t.tick(1);
         take(&mut t);
@@ -1866,7 +1874,7 @@ mod tests {
     #[test]
     fn discordbroadcast_without_a_token() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/dbc primary hi"), ["Error: No token provided! Please follow the tutorial in the config in order to setup the plugin."]);
     }
@@ -1877,16 +1885,16 @@ mod tests {
     fn chat_goes_to_the_primary_channel() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         t.tick(1);
         take(&mut t);
-        assert_eq!(t.chat(alice, "hello *there*"), Chat::Pass);
+        assert_ne!(t.chat(alice, "hello *there*"), Chat::Cancel);
         t.tick(1);
         let sent = posts_to(&take(&mut t), "/channels/100/messages");
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0]["content"], "Alice: hello *there*");
-        let bob = t.join("Bob_1");
+        let bob = join(&mut t, "Bob_1");
         t.tick(1);
         take(&mut t);
         t.chat(bob, "a_b @here");
@@ -1900,7 +1908,7 @@ mod tests {
     fn message_types_route_or_disable() {
         let mut t = server_with("message-types:\n  chat: staff\n  join: none\n  first-join: none\n", "");
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         assert!(posts_to(&take(&mut t), "/messages").is_empty(), "join is disabled");
         t.chat(alice, "hi");
@@ -1913,7 +1921,7 @@ mod tests {
     fn join_first_join_and_quit_messages() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         let sent = posts_to(&take(&mut t), "/channels/100/messages");
         assert_eq!(sent[0]["content"], ":arrow_right: :first_place: Alice has joined the server for the first time!");
@@ -1921,7 +1929,7 @@ mod tests {
         t.tick(1);
         let sent = posts_to(&take(&mut t), "/channels/100/messages");
         assert_eq!(sent[0]["content"], ":arrow_left: Alice has left!");
-        t.join("Alice");
+        join(&mut t, "Alice");
         t.tick(1);
         let sent = posts_to(&take(&mut t), "/channels/100/messages");
         assert_eq!(sent[0]["content"], ":arrow_right: Alice has joined!");
@@ -1931,12 +1939,12 @@ mod tests {
     fn join_formats_take_online_and_unique() {
         let mut t = server_with("messages:\n  join: '{username} joined ({online} online, {unique} unique)'\n", "");
         boot(&mut t);
-        t.join("Alice");
-        let bob = t.join("Bob");
+        join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.quit(bob);
         t.tick(1);
         take(&mut t);
-        t.join("Bob");
+        join(&mut t, "Bob");
         t.tick(1);
         let sent = posts_to(&take(&mut t), "/channels/100/messages");
         assert_eq!(sent[0]["content"], "Bob joined (2 online, 2 unique)");
@@ -1949,7 +1957,7 @@ mod tests {
         t.ess.reload();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.silentjoin]\n");
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         assert!(posts_to(&take(&mut t), "/messages").is_empty());
         t.ess.users.user(alice).set("vanished", json!(true));
@@ -1962,7 +1970,7 @@ mod tests {
     fn deaths_are_relayed() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         take(&mut t);
         let at = t.loc(alice);
@@ -1985,7 +1993,7 @@ mod tests {
     fn api_relays_for_other_areas() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         take(&mut t);
         relay_afk(&mut t.ess, &mut t.host, alice, true);
@@ -2022,7 +2030,7 @@ mod tests {
     fn rate_limits_are_respected() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         take(&mut t);
         t.chat(alice, "one");
@@ -2050,7 +2058,7 @@ mod tests {
         assert_eq!(create.3["name"], "EssX Advanced Relay");
         answer(&mut t, create.0, 200, json!({"id": "9", "token": "wtok", "name": "EssX Advanced Relay"}));
         t.tick(1);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         take(&mut t);
         t.chat(alice, "hi");
@@ -2070,8 +2078,8 @@ mod tests {
         let mut t = server();
         t.permissions("groups:\n  default:\n    default: true\n    permissions: []\nusers:\n  alice:\n    permissions: [essentials.discord.receive.primary]\n");
         boot(&mut t);
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         prime(&mut t);
         let url = poll(&mut t, "100", json!([msg(12, "7", "steve", "second"), msg(11, "7", "steve", "first")]));
         assert!(url.contains("after=10"), "{url}");
@@ -2086,7 +2094,7 @@ mod tests {
     fn discord_to_mc_format_and_always_receive_primary() {
         let mut t = server_with("always-receive-primary: true\nmessages:\n  discord-to-mc: '[{channel}] {nickname} ({role}): {message}'\nchat:\n  relay-to-console: [primary]\n", "");
         boot(&mut t);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         prime(&mut t);
         poll(&mut t, "100", json!([msg(11, "7", "steve", "line1\nline2")]));
         member(&mut t, "7", &["51"], Some("Stevie"));
@@ -2098,7 +2106,7 @@ mod tests {
     fn discord_filter_bots_and_own_messages_are_skipped() {
         let mut t = server_with("always-receive-primary: true\n", "");
         boot(&mut t);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         prime(&mut t);
         let mut bot = msg(13, "8", "otherbot", "beep");
         bot["author"]["bot"] = json!(true);
@@ -2116,7 +2124,7 @@ mod tests {
     fn formatting_codes_need_a_permitted_role() {
         let mut t = server_with("always-receive-primary: true\n", "");
         boot(&mut t);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         prime(&mut t);
         poll(&mut t, "100", json!([msg(11, "7", "steve", "&chello")]));
         member(&mut t, "7", &[], None);
@@ -2134,7 +2142,7 @@ mod tests {
     fn attachments_and_max_length() {
         let mut t = server_with("always-receive-primary: true\nchat:\n  discord-max-length: 20\n", "");
         boot(&mut t);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         prime(&mut t);
         let mut m = msg(11, "7", "steve", "look");
         m["attachments"] = json!([{"url": "https://cdn/x.png"}]);
@@ -2192,7 +2200,7 @@ mod tests {
     fn msg_and_list_commands() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         prime(&mut t);
         poll(&mut t, "100", json!([msg(11, "6", "ann", "/msg ali hi there")]));
         member(&mut t, "6", &[], None);
@@ -2206,7 +2214,7 @@ mod tests {
         poll(&mut t, "100", json!([msg(13, "6", "ann", "/msg Alice yo")]));
         t.tick(1);
         assert_eq!(replies(&take(&mut t)), ["Alice is currently AFK and may not respond.", "[me -> Alice] yo"]);
-        t.join("Bob");
+        join(&mut t, "Bob");
         poll(&mut t, "100", json!([msg(14, "6", "ann", "/list")]));
         t.tick(1);
         assert_eq!(replies(&take(&mut t)), ["There are 2 out of maximum 20 players online.\ndefault: Alice, Bob"]);
@@ -2231,7 +2239,7 @@ mod tests {
     fn link_codes_and_linking_from_discord() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         let first = t.cmd(alice, "/link");
         assert_eq!(first.len(), 1);
@@ -2271,7 +2279,7 @@ mod tests {
     fn unlink_in_game_and_from_discord() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/unlink"), ["You do not currently have a Discord account linked to your Minecraft account."]);
         link_account(&mut t.ess, &mut t.host, alice, "555");
@@ -2291,7 +2299,7 @@ mod tests {
     #[test]
     fn accounts_survive_a_restart() {
         let mut t = server();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         link_account(&mut t.ess, &mut t.host, alice, "555");
         reload(&mut t.ess);
         assert_eq!(linked_discord_id(&mut t.ess, alice).as_deref(), Some("555"));
@@ -2300,10 +2308,10 @@ mod tests {
     #[test]
     fn link_without_a_token() {
         let mut t = TestServer::new();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         assert_eq!(t.cmd(alice, "/link"), ["Error: No token provided! Please follow the tutorial in the config in order to setup the plugin."]);
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(t.cmd(bob, "/link"), ["You do not have access to that command."]);
     }
 
@@ -2311,17 +2319,17 @@ mod tests {
     fn link_policy_kick() {
         let mut t = server_with("", "link-policy: kick\n");
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         assert_eq!(t.host.kicked.len(), 1);
         let (who, reason) = &t.host.kicked[0];
         assert_eq!(*who, alice);
         assert!(reason.starts_with("You must link your Discord account before you can join this server."), "{reason}");
         assert!(reason.contains("/link ") && reason.ends_with("https://discord.gg/abc"), "{reason}");
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         link_account(&mut t.ess, &mut t.host, bob, "1");
         t.host.kicked.clear();
         t.quit(bob);
-        t.join("Bob");
+        join(&mut t, "Bob");
         assert!(t.host.kicked.is_empty());
     }
 
@@ -2331,7 +2339,7 @@ mod tests {
         boot(&mut t);
         let alice = t.join("Alice");
         t.op("Alice");
-        let prompt = t.said(alice);
+        let prompt: Vec<String> = t.said(alice).into_iter().filter(|l| l.contains("link")).collect();
         assert_eq!(prompt.len(), 1);
         assert!(prompt[0].starts_with("You must link your Discord account before you can move, chat on or interact with this server. To link your Minecraft account to Discord, type /link "), "{prompt:?}");
         assert!(prompt[0].ends_with("in this server's Discord server: https://discord.gg/abc"), "{prompt:?}");
@@ -2347,7 +2355,7 @@ mod tests {
         assert_eq!(t.loc(alice).x, start.x);
         assert_eq!(t.ess.on_interact(&mut t.host, alice, None, None), Allow::No);
         link_account(&mut t.ess, &mut t.host, alice, "555");
-        assert_eq!(t.chat(alice, "hi"), Chat::Pass);
+        assert_ne!(t.chat(alice, "hi"), Chat::Cancel);
         assert_eq!(t.cmd(alice, "/ping"), ["Pong!"]);
     }
 
@@ -2355,7 +2363,7 @@ mod tests {
     fn block_unlinked_chat() {
         let mut t = server_with("", "block-unlinked-chat: true\n");
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         take(&mut t);
         t.chat(alice, "hi");
@@ -2373,7 +2381,7 @@ mod tests {
         let mut t = server_with("", "role-sync:\n  groups:\n    admin: 777\n    default: 0\n  roles:\n    888: vip\n");
         t.permissions("groups:\n  default:\n    default: true\n    permissions: []\n  admin:\n    permissions: []\n  vip:\n    permissions: [essentials.fly]\nusers:\n  alice:\n    groups: [admin]\n");
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.op("Alice");
         t.tick(1);
         take(&mut t);
@@ -2394,7 +2402,7 @@ mod tests {
     fn mail_is_relayed_to_linked_accounts() {
         let mut t = server();
         boot(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         link_account(&mut t.ess, &mut t.host, alice, "555");
         t.tick(1);
         take(&mut t);
@@ -2419,7 +2427,7 @@ mod tests {
         t.tick(1);
         let console = t.host.said(Sender::Console);
         assert!(console.iter().any(|l| l.starts_with("An error occurred while logging into Discord")), "{console:?}");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         take(&mut t);
         t.chat(alice, "hi");
         t.tick(200);

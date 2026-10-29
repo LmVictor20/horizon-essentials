@@ -502,6 +502,11 @@ pub(crate) mod tests {
     use super::*;
     use crate::game::ess_testkit::*;
 
+    /// Only GeoIP's lines (other areas greet joiners too).
+    fn geo(lines: Vec<String>) -> Vec<String> {
+        lines.into_iter().filter(|l| l.contains("comes from") || l.contains("GeoIP") || l.contains("geo")).collect()
+    }
+
     // ----- A tiny .mmdb writer (just enough of the format for the reader's tests) -----
     pub fn ctrl(kind: u8, size: usize) -> Vec<u8> {
         let mut out = Vec::new();
@@ -781,14 +786,14 @@ pub(crate) mod tests {
         t.said(bob);
         t.host.said(Sender::Console);
         let carol = join_from(&mut t, "Carol", "81.2.69.160");
-        assert_eq!(t.said(admin), ["Player Carol comes from United Kingdom."]);
+        assert_eq!(geo(t.said(admin)), ["Player Carol comes from United Kingdom."]);
         // The default group has essentials.geoip.show (DEFAULT_PERMISSIONS), the joiner included.
-        assert_eq!(t.said(bob), ["Player Carol comes from United Kingdom."]);
-        assert_eq!(t.said(carol), ["Player Carol comes from United Kingdom."]);
+        assert_eq!(geo(t.said(bob)), ["Player Carol comes from United Kingdom."]);
+        assert_eq!(geo(t.said(carol)), ["Player Carol comes from United Kingdom."]);
         t.permissions("users:\n  bob:\n    permissions: [-essentials.geoip.show]\n");
         join_from(&mut t, "Dave", "2.125.160.216");
-        assert_eq!(t.said(admin), ["Player Dave comes from Germany."]);
-        assert!(t.said(bob).is_empty());
+        assert_eq!(geo(t.said(admin)), ["Player Dave comes from Germany."]);
+        assert!(geo(t.said(bob)).is_empty());
         assert_eq!(t.host.said(Sender::Console), ["Player Carol comes from United Kingdom.", "Player Dave comes from Germany."]);
         assert_eq!(geo_location(&mut t.ess, carol).as_deref(), Some("United Kingdom"));
         assert_eq!(
@@ -806,14 +811,14 @@ pub(crate) mod tests {
         t.host.p(op).op = 4;
         t.host.p(op).address = "81.2.69.1".into();
         t.ess.on_join(&mut t.host, op);
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert_eq!(geo_location(&mut t.ess, op), None);
         // Vanished players: located (whois) but not announced.
         let dave = t.host.add_player("Dave");
         t.host.p(dave).address = "2.125.160.216".into();
         t.ess.users.user(dave).set("vanished", json!(true));
         t.ess.on_join(&mut t.host, dave);
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert_eq!(geo_location(&mut t.ess, dave).as_deref(), Some("Germany"));
     }
 
@@ -823,7 +828,7 @@ pub(crate) mod tests {
         let mut t = server(&cfg, Some(("GeoIP2-Country.mmdb", country_db())));
         let admin = join_admin(&mut t);
         let carol = join_from(&mut t, "Carol", "81.2.69.160");
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert_eq!(whois_line(&mut t.ess, &mut t.host, carol), None);
     }
 
@@ -833,9 +838,9 @@ pub(crate) mod tests {
         let mut t = server(&cfg, Some(("GeoIP2-City.mmdb", city_db())));
         let admin = join_admin(&mut t);
         join_from(&mut t, "Carol", "81.2.69.160");
-        assert_eq!(t.said(admin), ["Player Carol comes from London, England, United Kingdom."]);
+        assert_eq!(geo(t.said(admin)), ["Player Carol comes from London, England, United Kingdom."]);
         join_from(&mut t, "Sven", "89.160.20.112");
-        assert_eq!(t.said(admin), ["Player Sven comes from Sweden."]);
+        assert_eq!(geo(t.said(admin)), ["Player Sven comes from Sweden."]);
     }
 
     #[test]
@@ -844,11 +849,11 @@ pub(crate) mod tests {
         let admin = join_admin(&mut t);
         // FakeHost addresses are loopback: "an unknown country".
         t.join("Bob");
-        assert_eq!(t.said(admin), ["Player Bob comes from an unknown country."]);
+        assert_eq!(geo(t.said(admin)), ["Player Bob comes from an unknown country."]);
         // A public address missing from the database: logged, then announced with an empty place (as EssentialsX).
         t.host.said(Sender::Console);
         join_from(&mut t, "Eve", "8.8.8.8");
-        assert_eq!(t.said(admin), ["Player Eve comes from ."]);
+        assert_eq!(geo(t.said(admin)), ["Player Eve comes from ."]);
         let console = t.host.said(Sender::Console);
         assert!(console[0].starts_with("Failed to read GeoIP database!"), "{console:?}");
     }
@@ -860,7 +865,7 @@ pub(crate) mod tests {
         let admin = join_admin(&mut t);
         assert!(t.host.said(Sender::Console).is_empty());
         join_from(&mut t, "Carol", "81.2.69.160");
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert!(t.host.said(Sender::Console).is_empty());
         assert!(t.host.http_requests.is_empty());
 
@@ -871,7 +876,7 @@ pub(crate) mod tests {
         t.ess.on_join(&mut t.host, admin);
         assert_eq!(t.host.said(Sender::Console), ["Can't find GeoIP database!"]);
         join_from(&mut t, "Carol", "81.2.69.160");
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert_eq!(
             t.host.said(Sender::Console),
             ["Unable to fetch GeoIP data for Carol. Please ensure that your license key and configuration are correct."]
@@ -924,7 +929,7 @@ pub(crate) mod tests {
         let mut t = TestServer::new();
         let admin = join_admin(&mut t);
         join_from(&mut t, "Carol", "81.2.69.160");
-        assert!(t.said(admin).is_empty());
+        assert!(geo(t.said(admin)).is_empty());
         assert!(t.host.http_requests.is_empty());
     }
 }

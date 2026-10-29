@@ -798,6 +798,14 @@ mod tests {
     use super::*;
     use crate::game::ess_testkit::*;
 
+    /// Joins and drops the join-time lines other areas send (motd, mail notices...).
+    fn join(t: &mut TestServer, name: &str) -> Uuid {
+        let u = t.join(name);
+        t.tick(1);
+        t.said(u);
+        u
+    }
+
     const CONFIG: &str = "xmpp:\n  server: 'chat.example.org'\n  user: 'bot'\n  password: 'secret'\n  sasl-enabled: true\nop-users:\n  - 'admin@example.org'\n";
 
     fn server(config: &str) -> TestServer {
@@ -843,7 +851,7 @@ mod tests {
     #[test]
     fn unconfigured_xmpp_stays_off_and_quiet() {
         let mut t = server("");
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(5);
         assert!(t.host.tcp_opened.is_empty());
         assert!(t.host.said(Sender::Console).is_empty());
@@ -923,7 +931,7 @@ mod tests {
     fn setxmpp_xmpp_and_spy_storage() {
         let mut t = server(CONFIG);
         let id = online(&mut t);
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         sent(&mut t, id);
         assert_eq!(t.cmd(alice, "/setxmpp alice@example.org"), ["XMPP address set to alice@example.org"]);
@@ -946,7 +954,7 @@ mod tests {
         assert!(spy_users(&t.ess).is_empty());
         assert_eq!(t.console("xmppspy nobody"), ["Error: Player not found."]);
         // A spy without an address is stored but relays nowhere.
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         t.op("Bob");
         assert_eq!(t.cmd(bob, "/xmppspy @s"), ["XMPP Spy enabled for Bob"]);
         assert_eq!(t.ess.read_yaml("xmpp/users.yml")["bob"]["spy"], true);
@@ -957,7 +965,7 @@ mod tests {
     fn permissions_follow_the_nodes() {
         let mut t = server(CONFIG);
         t.permissions("groups:\n  default:\n    default: true\n    permissions: [essentials.setxmpp]\n");
-        let bob = t.join("Bob");
+        let bob = join(&mut t, "Bob");
         assert_eq!(t.cmd(bob, "/xmpp x y"), ["You do not have access to that command."]);
         assert_eq!(t.cmd(bob, "/xmppspy Bob"), ["You do not have access to that command."]);
         assert_eq!(t.cmd(bob, "/setxmpp b@x"), ["XMPP address set to b@x"]);
@@ -968,7 +976,7 @@ mod tests {
         let mut t = server(CONFIG);
         let id = online(&mut t);
         std::fs::write(t.ess.dir.join("xmpp/users.yml"), "spyguy:\n  address: spy@example.org\n  spy: true\n").unwrap();
-        let alice = t.join("Alice");
+        let alice = join(&mut t, "Alice");
         t.tick(1);
         assert_eq!(
             sent(&mut t, id),
@@ -977,7 +985,7 @@ mod tests {
         assert_eq!(t.chat(alice, "hi all"), Chat::Pass);
         t.tick(1);
         assert_eq!(sent(&mut t, id), "<message to='spy@example.org' type='chat'><body>&lt;Alice&gt; hi all</body></message>");
-        t.join("Bob");
+        join(&mut t, "Bob");
         t.tick(1);
         assert!(sent(&mut t, id).starts_with("<presence><status>2 players online.</status>"));
         t.quit(alice);
@@ -990,8 +998,8 @@ mod tests {
     fn incoming_messages_chat_whisper_and_commands() {
         let mut t = server(CONFIG);
         let id = online(&mut t);
-        let alice = t.join("Alice");
-        let bob = t.join("Bob");
+        let alice = join(&mut t, "Alice");
+        let bob = join(&mut t, "Bob");
         t.cmd(alice, "/setxmpp alice@example.org");
         std::fs::write(
             t.ess.dir.join("xmpp/users.yml"),
