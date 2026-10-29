@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ess-standalone"]
+members = ["crates/ess-standalone", "tools/ess-gen"]
 # Built against the pinned Horizon export by tools/horizon.py's stage (its own workspace).
 exclude = ["tools/ess-bot"]
 resolver = "2"

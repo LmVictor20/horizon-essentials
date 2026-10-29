@@ -1,3 +1,5 @@
+# horizon-essentials core bundle: the shared runtime, data, glue and the two base hooks. Each feature area is
+# its own bundle in mixins/ess-<area>/ (its modules and hooks), so areas never edit this file.
 [mod]
 id = "horizon-essentials"
 version = "0.1.0"
@@ -6,14 +8,56 @@ priority = 100
 [compatibility]
 horizon_revision = "9669600c389ad6d205db4ec0bb061935f2a38d0c"
 
-# Pure logic: no Horizon types. Also compiled standalone by crates/ess-standalone.
+# ----- Pure modules (also compiled by crates/ess-standalone) -----
+[[module]]
+id = "areas"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_areas"
+source = "ess_areas.rs"
+
 [[module]]
 id = "core"
 file = "crates/horizon-client/src/game.rs"
 name = "ess_core"
 source = "ess_core.rs"
 
-# Game-only glue: reads and drives the server through Game/Hub.
+[[module]]
+id = "defaults"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_defaults"
+source = "ess_defaults.rs"
+
+[[module]]
+id = "messages"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_messages"
+source = "ess_messages.rs"
+
+[[module]]
+id = "meta"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_meta"
+source = "ess_meta.rs"
+
+[[module]]
+id = "testkit"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_testkit"
+source = "ess_testkit.rs"
+
+[[module]]
+id = "text"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_text"
+source = "ess_text.rs"
+
+[[module]]
+id = "yaml"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_yaml"
+source = "ess_yaml.rs"
+
+# ----- Game-only glue -----
 [[module]]
 id = "glue"
 file = "crates/horizon-client/src/game.rs"
@@ -30,4 +74,14 @@ bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
   { name = "command", ty = "&str", value = "command" },
   { name = "ran", ty = "&mut bool", value = "&mut *ran" },
+]
+
+# Once per server tick: Essentials starts, sees joins and quits, runs queued commands and ticks.
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tick"
+helper = "hook_tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
 ]

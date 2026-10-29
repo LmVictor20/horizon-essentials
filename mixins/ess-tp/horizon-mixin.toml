@@ -1,0 +1,23 @@
+[mod]
+id = "horizon-essentials-tp"
+version = "0.1.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "9669600c389ad6d205db4ec0bb061935f2a38d0c"
+
+# Pure logic (also compiled by crates/ess-standalone for fast tests).
+[[module]]
+id = "tp"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_tp"
+source = "ess_tp.rs"
+
+# Game-only glue: this area's Host methods (and its hooks' handlers).
+[[module]]
+id = "glue-tp"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_glue_tp"
+source = "ess_glue_tp.rs"
+
+# This area's injections go below ([[injection]] entries with helpers in this folder).
