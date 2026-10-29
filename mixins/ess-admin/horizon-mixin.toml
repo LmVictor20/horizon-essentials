@@ -39,3 +39,16 @@ bindings = [
   { name = "lists", ty = "&std::sync::Arc<std::sync::Mutex<crate::game::dedicated::Lists>>", value = "lists" },
 ]
 
+# A guest's /list goes through the command queue (and so to Essentials) instead of Horizon's built-in answer.
+[[injection]]
+id = "guest-list"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::lan_actions::Game<'_>::guest_command"
+helper = "hook_guest_list.rs"
+bindings = [
+  { name = "host", ty = "&mut crate::game::lan::LanHost", value = "&mut *host" },
+  { name = "conn", ty = "u32", value = "conn" },
+  { name = "command", ty = "&str", value = "command" },
+]
+

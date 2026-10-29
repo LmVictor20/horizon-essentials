@@ -2522,6 +2522,9 @@ mod tests {
         t.op("Alice");
         let bob = t.join("Bob");
         t.host.said(Sender::Console);
+        // Other areas' join messages (MOTD, mail) are not ours.
+        t.said(alice);
+        t.said(bob);
         (t, alice, bob)
     }
 
@@ -2662,6 +2665,7 @@ mod tests {
     fn ban_kicks_logs_and_notifies() {
         let (mut t, alice, bob) = server();
         let carol = t.join("Carol");
+        t.said(carol);
         assert_eq!(t.cmd(alice, "/ban Bob Griefing &cbadly"), ["Player Alice banned Bob for: Griefing badly."]);
         assert_eq!(t.host.kicked, [(bob, "You have been banned:\nGriefing badly".to_string())]);
         assert_eq!(t.host.bans.len(), 1);
@@ -3252,6 +3256,8 @@ mod tests {
         t.host.p(bob).loc = Loc::new("minecraft:overworld", 20.5, 64.0, 20.5);
         t.tick(1);
         t.host.said(Sender::Console);
+        t.said(alice);
+        t.said(bob);
         (t, alice, bob, cell)
     }
 
@@ -3365,7 +3371,7 @@ mod tests {
         assert_eq!(t.console("jail Bob cell"), ["Player Bob jailed."]);
         t.join("Bob");
         assert_eq!(t.loc(bob), cell);
-        assert_eq!(t.said(bob), ["You do the crime, you do the time."]);
+        assert_eq!(t.said(bob).last().unwrap(), "You do the crime, you do the time.");
         t.console("unjail Bob");
         // teleport-when-freed: off keeps them where they are.
         assert_eq!(t.loc(bob), cell);

@@ -1,4 +1,5 @@
 # Admin (L3): a jail is set, a second player is jailed (teleported, commands refused) and freed back.
+import time
 
 
 def op(t, bot):
@@ -19,14 +20,14 @@ def test_jail_and_unjail(t):
     alice.cmd("/jails")
     alice.expect(r"^Jails: cell$")
     bob = t.bot("Bob")
-    bob.move(cell["x"] + 6, cell["y"], cell["z"] + 6)
-    import time
-    time.sleep(1)
+    start = last_pos(bob)
+    # Bob starts somewhere else than the cell (random spawn spread); he is sent there and back.
     alice.cmd("/jail Bob cell")
     alice.expect(r"^Player Bob jailed\.$")
     alice.expect(r"^Player Bob jailed by Alice\.$")
-    bob.expect(r"^You have been jailed!$")
     bob.expect_pos(cell["x"], cell["y"], cell["z"], within=1.0)
+    bob.expect(r"^You have been jailed!$")
+    time.sleep(0.5)
     bob.cmd("/seen Alice")
     bob.expect(r"^You do the crime, you do the time\.$")
     alice.cmd("/jailedplayers")
@@ -34,6 +35,6 @@ def test_jail_and_unjail(t):
     alice.cmd("/unjail Bob")
     bob.expect(r"^You have been released!$")
     alice.expect(r"^Player Bob unjailed\.$")
-    bob.expect_pos(cell["x"] + 6, cell["y"], cell["z"] + 6, within=1.5)
+    bob.expect_pos(start["x"], start["y"], start["z"], within=1.5)
     bob.cmd("/seen Alice")
     bob.expect(r"^Player Alice has been online since")
