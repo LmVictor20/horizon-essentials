@@ -29,4 +29,13 @@ impl GameHost<'_, '_> {
     pub(super) fn admin_statistic(&mut self, player: Uuid, stat: &str) -> i64 {
         0
     }
+    pub(super) fn admin_whitelisted(&mut self, player: Uuid) -> bool {
+        false
+    }
+    pub(super) fn admin_first_played(&mut self, player: Uuid) -> Option<i64> {
+        None
+    }
+    pub(super) fn admin_speeds(&mut self, player: Uuid) -> (f32, f32) {
+        (0.1, 0.2)
+    }
 }
