@@ -446,6 +446,19 @@ pub trait Host {
     // ---- area admin ----
     // ---- end admin ----
     // ---- area items ----
+    /// Every recipe as vanilla's recipe JSON (`data/minecraft/recipe/*.json`, ingredients as `minecraft:x`,
+    /// `#minecraft:tag` or lists), with its `id` added (/recipe, /condense).
+    fn recipes(&mut self) -> Vec<Value> {
+        Vec::new()
+    }
+    /// Whether an enchantment applies to an item (Bukkit's Enchantment.canEnchantItem).
+    fn can_enchant(&mut self, item: &str, enchantment: &str) -> bool {
+        true
+    }
+    /// The plugin containers players closed since the last call: (player, tag, items as they were left).
+    fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
+        Vec::new()
+    }
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----

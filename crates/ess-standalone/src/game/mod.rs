@@ -29,6 +29,8 @@ pub mod ess_admin;
 // ----- area: items -----
 #[path = "../../../../mixins/ess-items/ess_items.rs"]
 pub mod ess_items;
+#[path = "../../../../mixins/ess-items/ess_items_db.rs"]
+pub mod ess_items_db;
 // ----- area: economy -----
 #[path = "../../../../mixins/ess-economy/ess_economy.rs"]
 pub mod ess_economy;

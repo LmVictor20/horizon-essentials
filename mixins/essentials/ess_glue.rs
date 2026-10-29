@@ -492,6 +492,15 @@ impl Host for GameHost<'_, '_> {
     // ---- area admin ----
     // ---- end admin ----
     // ---- area items ----
+    fn recipes(&mut self) -> Vec<Value> {
+        self.items_recipes()
+    }
+    fn can_enchant(&mut self, item: &str, enchantment: &str) -> bool {
+        self.items_can_enchant(item, enchantment)
+    }
+    fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
+        self.items_closed_containers()
+    }
     // ---- end items ----
     // ---- area economy ----
     // ---- end economy ----
