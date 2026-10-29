@@ -463,6 +463,31 @@ pub trait Host {
     }
     // ---- end admin ----
     // ---- area items ----
+    /// Every recipe as vanilla's recipe JSON (`data/minecraft/recipe/*.json`, ingredients as `minecraft:x`,
+    /// `#minecraft:tag` or lists), with its `id` added (/recipe, /condense).
+    fn recipes(&mut self) -> Vec<Value> {
+        Vec::new()
+    }
+    /// Whether an enchantment applies to an item (Bukkit's Enchantment.canEnchantItem).
+    fn can_enchant(&mut self, item: &str, enchantment: &str) -> bool {
+        true
+    }
+    /// The plugin containers players closed since the last call: (player, tag, items as they were left).
+    fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
+        Vec::new()
+    }
+    /// Plugin containers opened since the last call that still need a click policy: (player, tag, raw slots).
+    /// Clicks arrive while Essentials can't be asked, so the items area asks the container_click listeners
+    /// for every raw slot once, right after the open, and hands the answers back with `set_container_policy`.
+    fn opened_containers(&mut self) -> Vec<(Uuid, String, usize)> {
+        Vec::new()
+    }
+    /// Which raw slots of a player's open plugin container may be clicked (container_click's answers).
+    fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {}
+    /// Item uses seen since the last call, before the use: (player, slot, held item, survival, on a block).
+    fn item_uses(&mut self) -> Vec<(Uuid, usize, Item, bool, bool)> {
+        Vec::new()
+    }
     // ---- end items ----
     // ---- area economy ----
     /// Whether the player is sneaking (bulk buying and selling on [Buy]/[Sell] signs).

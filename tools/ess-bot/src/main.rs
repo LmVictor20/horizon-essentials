@@ -216,6 +216,17 @@ fn read(mut reader: ConnReader, writer: Arc<Mutex<ConnWriter>>, position: Arc<Mu
                 }
                 Ok(())
             }
+            // Inventories and screens (items area): `slots` for a whole container, `slot` for one, `open`.
+            cb::CONTAINER_SET_CONTENT | cb::CONTAINER_SET_SLOT | cb::OPEN_SCREEN => {
+                let stack = |s: &Option<horizon_protocol::item::Stack>| s.as_ref().map(|s| json!({"item": s.item, "count": s.count}));
+                match play::Clientbound::decode(id, &body) {
+                    Ok(play::Clientbound::ContainerSetContent(p)) => emit(json!({"ev": "slots", "container": p.container, "items": p.items.iter().map(stack).collect::<Vec<_>>()})),
+                    Ok(play::Clientbound::ContainerSetSlot(p)) => emit(json!({"ev": "slot", "container": p.container, "slot": p.slot, "item": stack(&p.item)})),
+                    Ok(play::Clientbound::OpenScreen(p)) => emit(json!({"ev": "open", "container": p.container, "menu": p.menu, "title": plain(&p.title)})),
+                    _ => {}
+                }
+                Ok(())
+            }
             cb::DISCONNECT | cb::START_CONFIGURATION => {
                 let reason = String::from_utf8_lossy(&body).chars().filter(|c| !c.is_control()).collect::<String>();
                 emit(json!({"ev": "disconnect", "reason": reason}));
@@ -295,6 +306,9 @@ fn main() {
                 send(play::Serverbound::MovePlayerPos(play::MovePlayerPos { x: at[0], y: at[1], z: at[2], flags: 1 }).encode())
                     && send(raw(sb::CLIENT_TICK_END, |_| {}))
             }
+            "close" => send(
+                play::Serverbound::ContainerClose(play::ContainerClose { container: op["container"].as_i64().unwrap_or(0) as i32 }).encode(),
+            ),
             "quit" => break,
             other => {
                 emit(json!({"ev": "error", "reason": format!("unknown op {other}")}));

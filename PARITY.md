@@ -164,55 +164,55 @@ Area-wide notes (tp): messages name players by their account name (nicknames and
 
 | Command | Module | Aliases | Status | Notes |
 |---|---|---|---|---|
-| /anvil | core |  | todo | |
-| /book | core |  | todo | |
-| /cartographytable | core | carttable | todo | |
-| /clearinventory | core | ci, clean, clear, clearinvent | todo | |
-| /clearinventoryconfirmtoggle | core | clearinventoryconfirmoff, clearconfirmoff, clearconfirmon, clearconfirm | todo | |
-| /condense | core | compact, blocks, toblocks | todo | |
-| /createkit | core | kitcreate, createk, kc, ck | todo | |
-| /delkit | core | remkit, rmkit, deletekit | todo | |
-| /disposal | core | trash | todo | |
-| /enchant | core | enchantment | todo | |
-| /enderchest | core | echest, endersee, ec | todo | |
-| /exp | core | xp | todo | |
-| /firework | core |  | todo | |
-| /give | core |  | todo | |
-| /grindstone | core |  | todo | |
-| /hat | core | head | todo | |
-| /item | core | i | todo | |
-| /itemdb | core | dura, durability, itemno | todo | |
-| /itemlore | core | lore, ilore | todo | |
-| /itemname | core | iname, itemrename, irename | todo | |
-| /kit | core | kits | todo | |
-| /kitreset | core | kitr, resetkit | todo | |
-| /loom | core |  | todo | |
-| /more | core |  | todo | |
-| /potion | core | elixer | todo | |
-| /powertool | core | pt | todo | |
-| /powertoollist | core | ptlist | todo | |
-| /powertooltoggle | core | ptt, pttoggle | todo | |
-| /recipe | core | formula, method, recipes | todo | |
-| /repair | core | fix | todo | |
-| /showkit | core | kitpreview, preview, kitshow | todo | |
-| /skull | core | playerskull, head | todo | |
-| /smithingtable | core | smithtable | todo | |
-| /stonecutter | core |  | todo | |
-| /unlimited | core | ul, unl | todo | |
-| /workbench | core | craft, wb, wbench | todo | |
+| /anvil | core |  | done | portable anvil (as_guest + open_station; block checks skipped while open); L3 items_give |
+| /book | core |  | done | sign/unsign, author, title; book.others/author/title perms |
+| /cartographytable | core | carttable | done | portable station |
+| /clearinventory | core | ci, clean, clear, clearinvent | done | *, **, items, amounts, others/all, confirm prompt (confirm-clear) |
+| /clearinventoryconfirmtoggle | core | clearinventoryconfirmoff, clearconfirmoff, clearconfirmon, clearconfirm | done | on/off labels; userdata confirm-clear, default-enabled-confirm-commands |
+| /condense | core | compact, blocks, toblocks | done | over vanilla recipe JSON from Horizon (square 2x2/3x3, reverse check) |
+| /createkit | core | kitcreate, createk, kc, ck | partial | writes kits.yml (slot:N lines, item meta); pastebin-createkit has no paste service: written locally; NBT (@base64) kits unsupported |
+| /delkit | core | remkit, rmkit, deletekit | done | kits.yml and kits/*.yml |
+| /disposal | core | trash | done | virtual 4-row container, items discarded on close; L3 items_give |
+| /enchant | core | enchantment | done | names/aliases from Enchantments.java, safe/unsafe levels, can_enchant from Horizon |
+| /enderchest | core | echest, endersee, ec | done | own: portable ender chest; others: virtual copy written back on close, read-only without essentials.enderchest.modify (click policy) |
+| /exp | core | xp | done | show/set/give/take/reset, `l` levels, others; uses world area exp Host methods |
+| /firework | core |  | partial | clear/power/meta work; fire spawns rockets via Host::spawn_entity (world area) with FireworksItem SNBT, directional velocity untested in-game |
+| /give | core |  | done | *, oversized, default-stack-size, meta, drop-items-if-full / giveSpawnFailure; L3 items_give |
+| /grindstone | core |  | done | portable station |
+| /hat | core | head | done | prevent-type (exact perms), binding curse, remove |
+| /item | core | i | done | amount, meta, blacklist/permission spawn, oversized; L3 items_give |
+| /itemdb | core | dura, durability, itemno | done | items.json names/aliases + custom_items.yml, durability |
+| /itemlore | core | lore, ilore | done | add/set/clear, max-itemlore-lines, colour perms; lore sent to clients by a Hub::stack hook |
+| /itemname | core | iname, itemrename, irename | partial | Horizon keeps custom_name as a plain string: colours travel as § codes (vanilla clients draw them), no hover/click styles |
+| /kit | core | kits | done | kits.yml + kits/*.yml, delays, one-time, list (struck when used), others, console; kit costs belong to economy (not charged); L3 items_give |
+| /kitreset | core | kitr, resetkit | done |  |
+| /loom | core |  | done | portable station |
+| /more | core |  | done | oversized aware |
+| /potion | core | elixer | partial | custom effects are written but Horizon keeps only potion_contents.potion (custom effects dropped on save/send); apply uses vanilla /effect; effect perm nodes use vanilla ids (essentials.potions.slowness, not slow) |
+| /powertool | core | pt | done | l:/d:/r:/a:, c: chat, {player}; console form; fired from Punch (left click) and guest_attack hooks |
+| /powertoollist | core | ptlist | done |  |
+| /powertooltoggle | core | ptt, pttoggle | done |  |
+| /recipe | core | formula, method, recipes | partial | text output for everyone (EssentialsX shows players a workbench view with the ingredients) |
+| /repair | core | fix | done | hand/all, armor perm, repair-enchanted; repair costs belong to economy (not charged) |
+| /showkit | core | kitpreview, preview, kitshow | done | text list like EssentialsX |
+| /skull | core | playerskull, head | done | names, texture hashes and base64 textures; profile sent to clients by the Hub::stack hook; others check on the receiver as EssentialsX |
+| /smithingtable | core | smithtable | done | portable station |
+| /stonecutter | core |  | done | portable station |
+| /unlimited | core | ul, unl | done | list/clear/toggle, others, permission-based-item-spawn; refill on block use (see feature row) |
+| /workbench | core | craft, wb, wbench | done | portable crafting table (lan_open_crafting at VEHICLE_KEY_Y, validity hook); L3 items_give |
 
 **Features (items)**
 
 | Feature | Status | Notes |
 |---|---|---|
-| kits.yml format (items, meta, commands), delays, one-time kits, kit-auto-equip, drop-items-if-full | todo | |
-| items.json item aliases (itemdb) | todo | |
-| unlimited items (no consumption on place) | todo | |
-| powertools: commands on interact ({player}) | todo | |
-| item-spawn-blacklist, permission-based-item-spawn | todo | |
-| oversized stacks | todo | |
-| virtual containers: disposal, kit preview, enderchest of others | todo | |
-| portable workstations (no block) | todo | |
+| kits.yml format (items, meta, commands), delays, one-time kits, kit-auto-equip, drop-items-if-full | done | items with EssentialsX meta (name, lore, enchantments, colour, player, book, firework, potion, banner, trim, itemflags, unbreakable, custom-model-data, [components]), slot:, /commands ({USERNAME}/{PLAYER}), $money via /eco, delays, one-time, kit-auto-equip, drop-items-if-full, essentials.kits.<name>; pub fn ess_items::give_kit for other areas |
+| items.json item aliases (itemdb) | done | generated by tools/items_db.py (1931 items, potions, spawners) + custom_items.yml + any registry id |
+| unlimited items (no consumption on place) | partial | block placement only (survival): held stack snapshotted before UseItemOn and restored next tick if spent; eggs and buckets (UseItem) not hooked |
+| powertools: commands on interact ({player}) | partial | left clicks (air and dig start) and hits on players fire; the dig itself is not cancelled (no macro-free hook on PlayerAction) |
+| item-spawn-blacklist, permission-based-item-spawn | done |  |
+| oversized stacks | done | essentials.oversizedstacks + oversized-stacksize in /give, /item, /more, kits |
+| virtual containers: disposal, kit preview, enderchest of others | done | Host::open_container via stand-in chest keys at VEHICLE_KEY_Y; click policy per open (container_click asked once per raw slot, Host::opened_containers/set_container_policy), container_close via Host::closed_containers each tick; kit preview is text (/showkit) as in EssentialsX |
+| portable workstations (no block) | done | all seven + ender chest |
 
 ## economy (9 commands)
 

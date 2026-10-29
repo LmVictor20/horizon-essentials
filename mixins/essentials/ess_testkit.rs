@@ -115,6 +115,14 @@ mod kit {
         pub logs: Vec<String>,
         // ---- end admin ----
         // ---- area items ----
+        /// Vanilla recipe JSON (`recipes`).
+        pub recipes: Vec<serde_json::Value>,
+        /// (item, enchantment) pairs `can_enchant` refuses.
+        pub unenchantable: Vec<(String, String)>,
+        /// What `closed_containers` reports next (tests push here).
+        pub closed: Vec<(Uuid, String, Vec<Option<Item>>)>,
+        /// Click policies set for open plugin containers: (player, tag) -> allowed per raw slot.
+        pub policies: HashMap<(Uuid, String), Vec<bool>>,
         // ---- end items ----
         // ---- area economy ----
         /// Players holding sneak (bulk sign trades).
@@ -221,6 +229,22 @@ mod kit {
                 logs: Vec::new(),
                 // ---- end admin ----
                 // ---- area items ----
+                recipes: serde_json::json!([
+                    {"id": "minecraft:iron_block", "type": "minecraft:crafting_shaped", "pattern": ["###", "###", "###"], "key": {"#": "minecraft:iron_ingot"}, "result": {"id": "minecraft:iron_block", "count": 1}},
+                    {"id": "minecraft:iron_ingot_from_iron_block", "type": "minecraft:crafting_shapeless", "ingredients": ["minecraft:iron_block"], "result": {"id": "minecraft:iron_ingot", "count": 9}},
+                    {"id": "minecraft:iron_ingot_from_nuggets", "type": "minecraft:crafting_shaped", "pattern": ["###", "###", "###"], "key": {"#": "minecraft:iron_nugget"}, "result": {"id": "minecraft:iron_ingot", "count": 1}},
+                    {"id": "minecraft:iron_nugget", "type": "minecraft:crafting_shapeless", "ingredients": ["minecraft:iron_ingot"], "result": {"id": "minecraft:iron_nugget", "count": 9}},
+                    {"id": "minecraft:iron_ingot_from_smelting_iron_ore", "type": "minecraft:smelting", "ingredient": "minecraft:iron_ore", "result": {"id": "minecraft:iron_ingot"}},
+                    {"id": "minecraft:diamond_block", "type": "minecraft:crafting_shaped", "pattern": ["###", "###", "###"], "key": {"#": "minecraft:diamond"}, "result": {"id": "minecraft:diamond_block", "count": 1}},
+                    {"id": "minecraft:diamond", "type": "minecraft:crafting_shapeless", "ingredients": ["minecraft:diamond_block"], "result": {"id": "minecraft:diamond", "count": 9}},
+                    {"id": "minecraft:stick", "type": "minecraft:crafting_shaped", "pattern": ["#", "#"], "key": {"#": "#minecraft:planks"}, "result": {"id": "minecraft:stick", "count": 4}},
+                    {"id": "minecraft:torch", "type": "minecraft:crafting_shaped", "pattern": ["X", "#"], "key": {"X": ["minecraft:coal", "minecraft:charcoal"], "#": "minecraft:stick"}, "result": {"id": "minecraft:torch", "count": 4}},
+                    {"id": "minecraft:diamond_sword", "type": "minecraft:crafting_shaped", "pattern": ["X", "X", "#"], "key": {"X": "minecraft:diamond", "#": "minecraft:stick"}, "result": {"id": "minecraft:diamond_sword"}},
+                    {"id": "minecraft:quartz_block", "type": "minecraft:crafting_shaped", "pattern": ["##", "##"], "key": {"#": "minecraft:quartz"}, "result": {"id": "minecraft:quartz_block"}}
+                ]).as_array().cloned().unwrap_or_default(),
+                unenchantable: Vec::new(),
+                closed: Vec::new(),
+                policies: HashMap::new(),
                 // ---- end items ----
                 // ---- area economy ----
                 economy_sneaking: Default::default(),
@@ -639,6 +663,29 @@ mod kit {
         }
         // ---- end admin ----
         // ---- area items ----
+        fn recipes(&mut self) -> Vec<serde_json::Value> {
+            self.recipes.clone()
+        }
+        fn can_enchant(&mut self, item: &str, enchantment: &str) -> bool {
+            !self.unenchantable.iter().any(|(i, e)| i == item && e == enchantment)
+        }
+        fn closed_containers(&mut self) -> Vec<(Uuid, String, Vec<Option<Item>>)> {
+            std::mem::take(&mut self.closed)
+        }
+        fn opened_containers(&mut self) -> Vec<(Uuid, String, usize)> {
+            let mut out = Vec::new();
+            for (uuid, p) in &self.players {
+                if let Some(c) = &p.open {
+                    if !self.policies.contains_key(&(*uuid, c.tag.clone())) {
+                        out.push((*uuid, c.tag.clone(), c.rows as usize * 9 + 36));
+                    }
+                }
+            }
+            out
+        }
+        fn set_container_policy(&mut self, player: Uuid, tag: &str, allowed: Vec<bool>) {
+            self.policies.insert((player, tag.to_string()), allowed);
+        }
         // ---- end items ----
         // ---- area economy ----
         fn sneaking(&mut self, player: Uuid) -> bool {
