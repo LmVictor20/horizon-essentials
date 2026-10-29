@@ -460,8 +460,13 @@ fn date_diff(unit: Unit, from: &mut i64, to: i64, future: bool) -> i64 {
 
 /// DateUtil.formatDateDiff(date) seen from `now`: "1 day 2 hours", at most three units, or "now".
 pub fn format_date_diff(ess: &Ess, now: i64, date: i64) -> String {
+    format_date_diff_with(&|key| ess.tl(key, &[]), now, date)
+}
+
+/// format_date_diff with the unit names from `tl` (the login gate runs without Essentials at hand).
+pub fn format_date_diff_with(tl: &dyn Fn(&str) -> String, now: i64, date: i64) -> String {
     if date == now {
-        return ess.tl("now", &[]);
+        return tl("now");
     }
     let future = date > now;
     let to = date + if future { 50 } else { -50 };
@@ -482,10 +487,10 @@ pub fn format_date_diff(ess: &Ess, now: i64, date: i64) -> String {
         let diff = date_diff(unit, &mut from, to, future);
         if diff > 0 {
             accuracy += 1;
-            out.push_str(&format!(" {diff} {}", ess.tl(if diff > 1 { many } else { one }, &[])));
+            out.push_str(&format!(" {diff} {}", tl(if diff > 1 { many } else { one })));
         }
     }
-    if out.is_empty() { ess.tl("now", &[]) } else { out.trim().to_string() }
+    if out.is_empty() { tl("now") } else { out.trim().to_string() }
 }
 
 fn date_diff_from_now(ctx: &mut Ctx, date: i64) -> String {

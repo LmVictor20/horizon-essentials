@@ -20,4 +20,22 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_admin"
 source = "ess_glue_admin.rs"
 
+# Ban lists, user cache and the login check: a module inside game/dedicated.rs sees its private items.
+[[module]]
+id = "dedicated-admin"
+file = "crates/horizon-client/src/game/dedicated.rs"
+name = "ess_admin_dedicated"
+source = "ess_admin_dedicated.rs"
+
 # This area's injections go below ([[injection]] entries with helpers in this folder).
+
+# Keep the server's Arc<Mutex<Lists>> (ops, whitelist, bans) when the dedicated server first syncs ops.
+[[injection]]
+id = "sync-ops"
+kind = "HEAD"
+target = "horizon_client::game::dedicated::Game<'_>::sync_ops"
+helper = "hook_sync_ops.rs"
+bindings = [
+  { name = "lists", ty = "&std::sync::Arc<std::sync::Mutex<crate::game::dedicated::Lists>>", value = "lists" },
+]
+
