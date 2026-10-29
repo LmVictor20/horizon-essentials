@@ -20,4 +20,29 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_world"
 source = "ess_glue_world.rs"
 
+
+[[module]]
+id = "discord"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_discord"
+source = "ess_discord.rs"
+
+[[module]]
+id = "geoip"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_geoip"
+source = "ess_geoip.rs"
+
+[[module]]
+id = "xmpp"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_xmpp"
+source = "ess_xmpp.rs"
+
+[[module]]
+id = "protect"
+file = "crates/horizon-client/src/game.rs"
+name = "ess_protect"
+source = "ess_protect.rs"
+
 # This area's injections go below ([[injection]] entries with helpers in this folder).

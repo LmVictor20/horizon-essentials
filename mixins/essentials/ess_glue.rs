@@ -496,5 +496,23 @@ impl Host for GameHost<'_, '_> {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {
+        self.world_http_request(id, method, url, headers, body)
+    }
+    fn http_poll(&mut self) -> Vec<(u64, u16, String)> {
+        self.world_http_poll()
+    }
+    fn tcp_open(&mut self, id: u64, host: &str, port: u16, tls: bool) {
+        self.world_tcp_open(id, host, port, tls)
+    }
+    fn tcp_send(&mut self, id: u64, data: &[u8]) {
+        self.world_tcp_send(id, data)
+    }
+    fn tcp_close(&mut self, id: u64) {
+        self.world_tcp_close(id)
+    }
+    fn tcp_poll(&mut self) -> Vec<(u64, Vec<u8>)> {
+        self.world_tcp_poll()
+    }
     // ---- end world ----
 }

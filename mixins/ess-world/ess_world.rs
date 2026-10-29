@@ -4,5 +4,8 @@
 use crate::game::ess_core::*;
 
 pub fn register(ess: &mut Ess) {
-    let _ = ess;
+    crate::game::ess_protect::register(ess);
+    crate::game::ess_discord::register(ess);
+    crate::game::ess_geoip::register(ess);
+    crate::game::ess_xmpp::register(ess);
 }

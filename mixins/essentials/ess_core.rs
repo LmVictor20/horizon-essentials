@@ -450,6 +450,21 @@ pub trait Host {
     // ---- area economy ----
     // ---- end economy ----
     // ---- area world ----
+    /// Starts an HTTP request (Discord REST, GeoIP download) off the server thread; its answer comes back
+    /// from `http_poll` with the same id. Hosts without network never answer.
+    fn http_request(&mut self, id: u64, method: &str, url: &str, headers: &[(String, String)], body: Option<&str>) {}
+    /// Finished HTTP requests since the last poll: (id, status (0 = transport error), body).
+    fn http_poll(&mut self) -> Vec<(u64, u16, String)> {
+        Vec::new()
+    }
+    /// Opens a TCP connection (XMPP), `tls` for an encrypted one; events come back from `tcp_poll`.
+    fn tcp_open(&mut self, id: u64, host: &str, port: u16, tls: bool) {}
+    fn tcp_send(&mut self, id: u64, data: &[u8]) {}
+    fn tcp_close(&mut self, id: u64) {}
+    /// TCP events since the last poll: (id, bytes received); an empty Vec means the connection closed.
+    fn tcp_poll(&mut self) -> Vec<(u64, Vec<u8>)> {
+        Vec::new()
+    }
     // ---- end world ----
 }
 

@@ -111,6 +111,16 @@ mod kit {
         // ---- area economy ----
         // ---- end economy ----
         // ---- area world ----
+        /// HTTP requests started: (id, method, url, headers, body).
+        pub http_requests: Vec<(u64, String, String, Vec<(String, String)>, Option<String>)>,
+        /// Answers the next `http_poll` hands back: (id, status, body).
+        pub http_answers: Vec<(u64, u16, String)>,
+        /// TCP connections opened: (id, host, port, tls), bytes sent per id, closed ids.
+        pub tcp_opened: Vec<(u64, String, u16, bool)>,
+        pub tcp_sent: HashMap<u64, Vec<u8>>,
+        pub tcp_closed: Vec<u64>,
+        /// Bytes the next `tcp_poll` hands back.
+        pub tcp_incoming: Vec<(u64, Vec<u8>)>,
         // ---- end world ----
         pub _regions: (),
     }
@@ -201,6 +211,12 @@ mod kit {
                 // ---- area economy ----
                 // ---- end economy ----
                 // ---- area world ----
+                http_requests: Vec::new(),
+                http_answers: Vec::new(),
+                tcp_opened: Vec::new(),
+                tcp_sent: HashMap::new(),
+                tcp_closed: Vec::new(),
+                tcp_incoming: Vec::new(),
                 // ---- end world ----
                 _regions: (),
             }

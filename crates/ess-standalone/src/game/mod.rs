@@ -35,3 +35,11 @@ pub mod ess_economy;
 // ----- area: world -----
 #[path = "../../../../mixins/ess-world/ess_world.rs"]
 pub mod ess_world;
+#[path = "../../../../mixins/ess-world/ess_discord.rs"]
+pub mod ess_discord;
+#[path = "../../../../mixins/ess-world/ess_geoip.rs"]
+pub mod ess_geoip;
+#[path = "../../../../mixins/ess-world/ess_protect.rs"]
+pub mod ess_protect;
+#[path = "../../../../mixins/ess-world/ess_xmpp.rs"]
+pub mod ess_xmpp;
