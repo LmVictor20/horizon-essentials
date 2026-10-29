@@ -494,6 +494,12 @@ impl Host for GameHost<'_, '_> {
     // ---- area items ----
     // ---- end items ----
     // ---- area economy ----
+    fn sneaking(&mut self, player: Uuid) -> bool {
+        self.economy_sneaking(player)
+    }
+    fn item_is_block(&mut self, item: &str) -> bool {
+        self.economy_item_is_block(item)
+    }
     // ---- end economy ----
     // ---- area world ----
     // ---- end world ----
