@@ -32,6 +32,14 @@ def landed(bot, x, y, z, since=0, within=0.6, timeout=10):
     raise AssertionError(f"{bot.name}: no teleport near {x} {y} {z}; positions {pos}")
 
 
+def join(t, name):
+    """A first join: wait for EssentialsSpawn's newbie teleport and welcome before moving the player."""
+    bot = t.bot(name)
+    seen(bot, rf"^Welcome {name} to the server!$")
+    time.sleep(0.5)
+    return bot
+
+
 def place(t, bot, x, z):
     m = mark(bot)
     t.console(f"tp {bot.name} {x} -60 {z}")
@@ -44,7 +52,7 @@ def op(t, name):
 
 
 def test_sethome_and_home(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     place(t, alice, 12, 34)
     a = mark(alice)
     alice.cmd("/sethome")
@@ -65,7 +73,7 @@ def test_sethome_and_home(t):
 
 
 def test_named_homes_list_and_delhome(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     op(t, "Alice")
     place(t, alice, 5, 5)
     a = mark(alice)
@@ -87,7 +95,7 @@ def test_named_homes_list_and_delhome(t):
 
 
 def test_back_after_teleport_and_death(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     op(t, "Alice")
     place(t, alice, 7, 7)
     place(t, alice, 70, 7)
@@ -104,12 +112,9 @@ def test_back_after_teleport_and_death(t):
 
 
 def test_top(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     op(t, "Alice")
-    a = mark(alice)
-    # Vanilla's tp (inside execute, which Essentials doesn't claim) puts her in the dirt.
-    t.console("execute in minecraft:overworld run tp Alice 3.5 -63 3.5")
-    landed(alice, 3.5, -63, 3.5, a)
+    place(t, alice, 3, 3)
     a = mark(alice)
     alice.cmd("/top")
     seen(alice, r"^Teleporting to top\.$", a)

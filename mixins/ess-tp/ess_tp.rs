@@ -721,9 +721,10 @@ fn safe_destination(ess: &Ess, host: &mut dyn Host, loc: &Loc) -> Result<Loc, Cm
     let mut z = loc.z.floor() as i32;
     let (ox, oy, oz) = (x, y, z);
     let unsafe_at =|host: &mut dyn Host, x: i32, y: i32, z: i32| y >= world_max || unsafe_block(ess, host, w, x, y, z);
+    // EssentialsX stops at y 0 (from before 1.18 worlds went below it); the world's bottom is meant.
     while above_air(ess, host, w, x, y, z) {
         y -= 1;
-        if y < 0 {
+        if y < min_y {
             y = oy;
             break;
         }

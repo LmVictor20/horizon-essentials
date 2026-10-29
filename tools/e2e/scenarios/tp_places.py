@@ -32,6 +32,14 @@ def landed(bot, x, y, z, since=0, within=0.6, timeout=10):
     raise AssertionError(f"{bot.name}: no teleport near {x} {y} {z}; positions {pos}")
 
 
+def join(t, name):
+    """A first join: wait for EssentialsSpawn's newbie teleport and welcome before moving the player."""
+    bot = t.bot(name)
+    seen(bot, rf"^Welcome {name} to the server!$")
+    time.sleep(0.5)
+    return bot
+
+
 def place(t, bot, x, z):
     m = mark(bot)
     t.console(f"tp {bot.name} {x} -60 {z}")
@@ -44,7 +52,7 @@ def op(t, name):
 
 
 def test_setwarp_and_warp(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     op(t, "Alice")
     place(t, alice, 40, -12)
     a = mark(alice)
@@ -65,8 +73,8 @@ def test_setwarp_and_warp(t):
 
 
 def test_setspawn_and_spawn(t):
-    alice = t.bot("Alice")
-    bob = t.bot("Bob")
+    alice = join(t, "Alice")
+    bob = join(t, "Bob")
     op(t, "Alice")
     place(t, alice, -25, 25)
     a = mark(alice)
@@ -83,7 +91,7 @@ def test_setspawn_and_spawn(t):
 
 
 def test_tpr_lands_on_the_ground(t):
-    alice = t.bot("Alice")
+    alice = join(t, "Alice")
     op(t, "Alice")
     place(t, alice, 0, 0)
     a = mark(alice)

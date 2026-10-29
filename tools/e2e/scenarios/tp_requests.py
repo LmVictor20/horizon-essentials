@@ -32,6 +32,14 @@ def landed(bot, x, y, z, since=0, within=0.6, timeout=10):
     raise AssertionError(f"{bot.name}: no teleport near {x} {y} {z}; positions {pos}")
 
 
+def join(t, name):
+    """A first join: wait for EssentialsSpawn's newbie teleport and welcome before moving the player."""
+    bot = t.bot(name)
+    seen(bot, rf"^Welcome {name} to the server!$")
+    time.sleep(0.5)
+    return bot
+
+
 def place(t, bot, x, z):
     """The console moves a player (Essentials' /tp) and waits for their client to see it."""
     m = mark(bot)
@@ -40,8 +48,8 @@ def place(t, bot, x, z):
 
 
 def test_tpa_and_tpaccept(t):
-    alice = t.bot("Alice")
-    bob = t.bot("Bob")
+    alice = join(t, "Alice")
+    bob = join(t, "Bob")
     place(t, bob, 20, 20)
     place(t, alice, -10, -10)
     a, b = mark(alice), mark(bob)
@@ -57,8 +65,8 @@ def test_tpa_and_tpaccept(t):
 
 
 def test_tpahere_and_tpdeny(t):
-    alice = t.bot("Alice")
-    bob = t.bot("Bob")
+    alice = join(t, "Alice")
+    bob = join(t, "Bob")
     place(t, alice, 15, -5)
     place(t, bob, -15, 5)
     a, b = mark(alice), mark(bob)
@@ -80,8 +88,8 @@ def test_tpahere_and_tpdeny(t):
 
 
 def test_tp_and_tphere_as_operator(t):
-    alice = t.bot("Alice")
-    bob = t.bot("Bob")
+    alice = join(t, "Alice")
+    bob = join(t, "Bob")
     t.console("op Alice")
     t.wait_log(r"Made Alice a server operator|Opped Alice")
     place(t, bob, 30, 30)
