@@ -40,11 +40,9 @@ def test_kit_tools(t):
     bob = t.bot("Bob")
     bob.cmd("/kit tools")
     bob.expect(r"^Received kit tools\.$")
-    seen = set()
-    while len(seen) < 4:
-        e = bob.expect_event(lambda e: bool(stacks(e)), 10, "the kit's four tools")
-        for s in stacks(e):
-            seen.add(s["item"])
+    # The inventory updates arrive before the message: look at everything recorded.
+    seen = {s["item"] for e in bob.lines for s in stacks(e)}
+    assert len(seen) >= 4, f"the kit's four tools: {seen}"
     bob.cmd("/kit tools")
     bob.expect(r"can't use that kit again for another")
 
