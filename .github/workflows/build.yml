@@ -110,7 +110,7 @@ jobs:
             echo "horizon-mixins $(jq -r .horizon_mixins_revision compatibility.json)"
             echo "glibc >= $need (built on Debian bookworm)"
           } > dist/BUILD-INFO.txt
-          (cd dist && sha256sum horizon-engine-essentials > SHA256SUMS)
+          (cd dist && sha256sum horizon-engine-essentials horizon_essentials.hnmod > SHA256SUMS)
           cat dist/BUILD-INFO.txt dist/SHA256SUMS
 
       - uses: actions/upload-artifact@v4
