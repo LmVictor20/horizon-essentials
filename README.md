@@ -154,10 +154,10 @@ python3 tools/horizon.py test  # the same tests inside Horizon
 python3 tools/e2e/run.py       # a real server with test players
 ```
 
-Packaging native mod archives (`.hnmod`):
+Packaging native mod archive (`.hnmod`):
 
 ```sh
-python3 tools/pack.py          # creates all-in-one and modular .hnmod packages in dist/
+python3 tools/pack.py          # creates horizon_essentials.hnmod in dist/
 python3 tools/pack.py --verify-engine  # also validates with Horizon's native bundle reader
 ```
 

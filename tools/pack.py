@@ -9,10 +9,8 @@ A native mod bundle (.hnmod) is a zip archive checked by horizon-mods (schema 1)
   - manifest id matching [a-z0-9_]{1,64}
 
 Usage:
-  python3 tools/pack.py                     # builds all-in-one and modular bundles in dist/
-  python3 tools/pack.py --all-in-one        # build only the unified all-in-one bundle
-  python3 tools/pack.py --modular           # build only the 7 individual area bundles
-  python3 tools/pack.py --bundle tp         # build only the tp bundle
+  python3 tools/pack.py                     # builds the single horizon_essentials.hnmod in dist/
+  python3 tools/pack.py --versioned         # outputs horizon_essentials-<version>.hnmod
   python3 tools/pack.py --verify-engine     # also verify with Rust horizon-mods::index::native
 """
 import argparse
@@ -265,7 +263,7 @@ def package_modular(out_dir: Path, area_name: str, compat: dict) -> Path:
     return out_file
 
 
-def package_all_in_one(out_dir: Path, compat: dict) -> Path:
+def package_all_in_one(out_dir: Path, compat: dict, versioned: bool = False) -> Path:
     """Packages all areas into a single unified horizon_essentials.hnmod."""
     mod_id = "horizon_essentials"
     core_toml = MIXINS_DIR / "essentials/horizon-mixin.toml"
@@ -354,7 +352,8 @@ def package_all_in_one(out_dir: Path, compat: dict) -> Path:
 
     combined_toml_bytes = dump_toml(combined_toml).encode("utf-8")
 
-    out_file = out_dir / f"{mod_id}-{version}.hnmod"
+    out_name = f"{mod_id}-{version}.hnmod" if versioned else f"{mod_id}.hnmod"
+    out_file = out_dir / out_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(out_file, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -363,12 +362,6 @@ def package_all_in_one(out_dir: Path, compat: dict) -> Path:
 
         for filename, content in sorted(files_to_pack.items()):
             zf.writestr(f"mixins/{mod_id}/{filename}", content)
-
-    # Convenience link/copy without version
-    symlink_file = out_dir / f"{mod_id}.hnmod"
-    if symlink_file.exists():
-        symlink_file.unlink()
-    shutil.copyfile(out_file, symlink_file)
 
     return out_file
 
@@ -424,8 +417,8 @@ path = {json.dumps(str(src_path))}
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out-dir", type=Path, default=ROOT / "dist", help="Output directory (default: dist/)")
-    parser.add_argument("--all-in-one", action="store_true", help="Build only the unified all-in-one bundle")
-    parser.add_argument("--modular", action="store_true", help="Build only modular area bundles")
+    parser.add_argument("--versioned", action="store_true", help="Include version in filename (e.g. horizon_essentials-0.1.0.hnmod)")
+    parser.add_argument("--modular", action="store_true", help="Build modular area bundles in dist/modular/")
     parser.add_argument("--bundle", type=str, help="Build only a specific area bundle (e.g. tp, social, essentials)")
     parser.add_argument("--no-verify", action="store_true", help="Skip bundle validation")
     parser.add_argument("--verify-engine", action="store_true", help="Run validation using Rust horizon-mods")
@@ -437,6 +430,12 @@ def main():
 
     if args.clean and out_dir.exists():
         shutil.rmtree(out_dir)
+
+    # If building single mod (default), remove any existing dist/modular to keep dist/ clean
+    if not args.modular and not args.bundle:
+        modular_dir = out_dir / "modular"
+        if modular_dir.exists():
+            shutil.rmtree(modular_dir)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     built = []
@@ -466,9 +465,6 @@ def main():
         modular_dir = out_dir / "modular"
         path = package_modular(modular_dir, area_map[key], compat)
         built.append(path)
-    elif args.all_in_one:
-        path = package_all_in_one(out_dir, compat)
-        built.append(path)
     elif args.modular:
         modular_dir = out_dir / "modular"
         areas = sorted([d.name for d in MIXINS_DIR.iterdir() if d.is_dir()])
@@ -476,15 +472,9 @@ def main():
             path = package_modular(modular_dir, area, compat)
             built.append(path)
     else:
-        # Default: build all-in-one and modular
-        aio = package_all_in_one(out_dir, compat)
-        built.append(aio)
-
-        modular_dir = out_dir / "modular"
-        areas = sorted([d.name for d in MIXINS_DIR.iterdir() if d.is_dir()])
-        for area in areas:
-            mod_path = package_modular(modular_dir, area, compat)
-            built.append(mod_path)
+        # Default: build one single unified mod file (horizon_essentials.hnmod)
+        path = package_all_in_one(out_dir, compat, versioned=args.versioned)
+        built.append(path)
 
     print(f"\nSuccessfully generated {len(built)} .hnmod packages:")
     all_ok = True
