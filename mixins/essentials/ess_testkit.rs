@@ -779,6 +779,14 @@ mod kit {
             self.host.p(player).online = false;
         }
 
+        /// The singleplayer host joining their own world: online like anyone, at the owner's op level.
+        pub fn join_host(&mut self, name: &str) -> Uuid {
+            let uuid = self.host.add_player(name);
+            self.host.p(uuid).op = crate::game::ess_core::HOST_OP_LEVEL;
+            self.ess.on_join(&mut self.host, uuid);
+            uuid
+        }
+
         /// Makes a player a vanilla operator (level 4).
         pub fn op(&mut self, name: &str) {
             let uuid = fake_uuid(name);

@@ -421,7 +421,7 @@ impl GameHost<'_, '_> {
 /// and weather kept, body flags and death rules mirrored from Essentials every second, kept inventories back
 /// after a respawn.
 pub(super) fn on_tick(game: &mut super::Game<'_>) {
-    if game.native_window() {
+    if !super::ess_glue::serves(game) {
         return;
     }
     let second = glue(|g| {

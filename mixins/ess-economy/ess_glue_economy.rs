@@ -94,7 +94,7 @@ impl GameHost<'_, '_> {
 /// next tick (interact listeners with the full host); another sign with text is that tick's interact event
 /// too, and its editor opens. The text is remembered for the edit's sign_change event.
 pub(super) fn on_open_sign_editor(game: &mut super::Game<'_>, host: &mut super::lan::LanHost, conn: u32, pos: [i32; 3], front: bool) -> ControlFlow<()> {
-    if game.native_window() {
+    if !super::ess_glue::serves(game) {
         return ControlFlow::Continue(());
     }
     let Some(g) = host.hub.guests.iter().find(|g| g.conn == conn) else { return ControlFlow::Continue(()) };
@@ -116,7 +116,7 @@ pub(super) fn on_open_sign_editor(game: &mut super::Game<'_>, host: &mut super::
 /// HEAD of `lan_open_container` (cancellable): opening a chest, furnace... is that block's interact event,
 /// decided now with a detached host ([Protection]).
 pub(super) fn on_open_container(game: &mut super::Game<'_>, host: &mut super::lan::LanHost, conn: u32, pos: [i32; 3]) -> ControlFlow<bool> {
-    if game.native_window() {
+    if !super::ess_glue::serves(game) {
         return ControlFlow::Continue(());
     }
     let Some(g) = host.hub.guests.iter().find(|g| g.conn == conn) else { return ControlFlow::Continue(()) };
@@ -145,7 +145,7 @@ pub(super) fn on_block_entity_updated(game: &mut super::Game<'_>, key: (i32, i32
 
 /// HEAD of `break_block_as_player` (cancellable): true cancels the break. Only a guest's breaks are asked.
 pub(super) fn on_break(game: &mut super::Game<'_>, pos: [i32; 3]) -> bool {
-    if game.native_window() {
+    if !super::ess_glue::serves(game) {
         return false;
     }
     let Some(uuid) = game.lan_acting_uuid else { return false };
@@ -161,7 +161,7 @@ pub(super) fn on_break(game: &mut super::Game<'_>, pos: [i32; 3]) -> bool {
 /// HEAD of `native_tick`, after the core's: the player snapshot for detached hosts, their messages, and the
 /// sign edits of the last tick.
 pub(super) fn on_tick(game: &mut super::Game<'_>) {
-    if game.native_window() {
+    if !super::ess_glue::serves(game) {
         return;
     }
     let Some(hub) = game.lan.as_ref().map(|l| &l.hub) else { return };

@@ -1583,9 +1583,108 @@ groups:
 users: {}
 ";
 
+// ===== Singleplayer and dedicated ================================================================
+// Pure decisions for the glue. A dedicated server and single player's server thread have no player of their own
+// (the owner is an ordinary guest there); only the window running a world in its own frame (`--in-frame`) has one.
+
+/// The op level of a singleplayer world's owner, whether its cheats are on or not.
+pub const HOST_OP_LEVEL: u8 = 4;
+
+/// Whether a Game runs Essentials: never a client of a server (even its own server thread, which runs Essentials
+/// itself), and a window only while it is in a world.
+pub fn serves_world(remote: bool, window: bool, in_world: bool) -> bool {
+    !remote && (!window || in_world)
+}
+
+/// Who typed a command: the guest whose turn it is, else the in-frame host, else the console.
+pub fn command_sender(acting: Option<Uuid>, host: Option<Uuid>) -> Sender {
+    acting.or(host).map_or(Sender::Console, Sender::Player)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::ess_testkit::TestServer;
+
+    // ----- Singleplayer and dedicated: who serves Essentials, and who typed a command ------------------
+
+    #[test]
+    fn essentials_runs_on_every_game_that_serves_a_world() {
+        // Dedicated server and single player's server thread: no window, never connected to a server.
+        assert!(serves_world(false, false, false));
+        // The window running the world in its own frame (--in-frame).
+        assert!(serves_world(false, true, true));
+    }
+
+    #[test]
+    fn essentials_stays_out_of_a_client() {
+        // The window connected to a server, third-party or its own server thread: that server decides.
+        assert!(!serves_world(true, true, true));
+        assert!(!serves_world(true, true, false));
+        // The window on the title screen has no world for Essentials to keep its data in.
+        assert!(!serves_world(false, true, false));
+    }
+
+    #[test]
+    fn a_guest_command_is_the_guests_even_with_a_host() {
+        assert_eq!(command_sender(Some(7), Some(1)), Sender::Player(7));
+        assert_eq!(command_sender(Some(7), None), Sender::Player(7));
+    }
+
+    #[test]
+    fn a_command_without_a_guest_is_the_hosts_or_else_the_consoles() {
+        assert_eq!(command_sender(None, Some(1)), Sender::Player(1));
+        assert_eq!(command_sender(None, None), Sender::Console);
+    }
+
+    #[test]
+    fn the_host_counts_as_a_full_operator() {
+        let mut t = TestServer::with_config("");
+        let host = t.join_host("Host");
+        assert_eq!(t.host.op_level(host), 4);
+        assert!(t.ess.has(&mut t.host, Sender::Player(host), "essentials.sethome"));
+        assert!(t.ess.has(&mut t.host, Sender::Player(host), "essentials.gamemode"));
+    }
+
+    #[test]
+    fn the_host_dispatches_as_a_player_and_hears_the_answer() {
+        let mut t = TestServer::with_config("teleport-delay: 0");
+        let host = t.join_host("Host");
+        t.said(host); // the join's MOTD
+        let sender = command_sender(None, Some(host));
+        assert!(t.ess.dispatch(&mut t.host, sender, "/sethome base"));
+        assert_eq!(t.host.said(Sender::Player(host)), ["Home set to current location."]);
+        assert_eq!(t.host.said(Sender::Console), Vec::<String>::new());
+        assert!(t.ess.users.user(host).get("homes.base").is_some());
+    }
+
+    #[test]
+    fn the_console_still_works_beside_a_host() {
+        let mut t = TestServer::with_config("");
+        let host = t.join_host("Host");
+        t.said(host); // the join's MOTD
+        // A player-only command: the console is told so, the host is not.
+        let said = t.console("/sethome base");
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert_eq!(t.host.said(Sender::Player(host)), Vec::<String>::new());
+        assert!(t.ess.users.user(host).get("homes.base").is_none());
+        // A command the console may run answers the console.
+        assert_eq!(t.console("/ping"), ["Pong!"]);
+        assert_eq!(t.host.said(Sender::Player(host)), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_lan_guest_beside_the_host_has_no_host_rights() {
+        let mut t = TestServer::with_config("");
+        let host = t.join_host("Host");
+        let guest = t.join("Guest");
+        assert_eq!(t.host.online().len(), 2);
+        assert!(t.ess.has(&mut t.host, Sender::Player(host), "essentials.gamemode"));
+        assert!(!t.ess.has(&mut t.host, Sender::Player(guest), "essentials.gamemode"));
+        assert_eq!(t.host.lookup("host"), Some((host, "Host".to_string())));
+    }
+
+    // ----- The rest -------------------------------------------------------------------------------------
 
     #[test]
     fn ping_answers_pong() {

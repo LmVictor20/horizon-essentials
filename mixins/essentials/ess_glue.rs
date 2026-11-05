@@ -20,6 +20,8 @@ thread_local! {
     static ONLINE: RefCell<Vec<Uuid>> = const { RefCell::new(Vec::new()) };
     /// Essentials started once (it is None only while a call holds it, never started twice).
     static STARTED: RefCell<bool> = const { RefCell::new(false) };
+    /// The folder the running Essentials keeps its data in.
+    static DATA_DIR: RefCell<Option<std::path::PathBuf>> = const { RefCell::new(None) };
     /// True while the glue itself runs a vanilla command: the command hook must not claim it.
     static RUNNING_VANILLA: RefCell<bool> = const { RefCell::new(false) };
 }
@@ -29,42 +31,66 @@ pub(super) struct GameHost<'a, 'g> {
     pub(super) game: &'a mut super::Game<'g>,
 }
 
+/// Whether this Game runs Essentials: a dedicated server, single player's server thread (the owner is a guest
+/// there), or the window running its world in the frame (`--in-frame`). Not a client: on any server, single
+/// player's own thread included, that server runs Essentials.
+pub(super) fn serves(game: &super::Game<'_>) -> bool {
+    ess_core::serves_world(game.remote.is_some(), game.native_window(), game.title.is_none())
+}
+
+/// The window's own player when it runs the world in the frame. Everywhere else players are guests.
+pub(super) fn host_uuid(game: &mut super::Game<'_>) -> Option<Uuid> {
+    // While a guest's turn runs, `game.player` holds that guest and the host is still there.
+    let host = game.native_window() && game.remote.is_none() && (game.player.is_some() || game.lan_acting_uuid.is_some());
+    host.then(|| horizon_client::lan::playerdata::ints_uuid(game.level.ensure_player_uuid()))
+}
+
+/// Starts Essentials if it isn't running for this world. The window's thread can open one world after another
+/// in the frame: the next world gets its own Essentials. (A server thread lives and dies with its world.)
+fn ensure_started(game: &super::Game<'_>) {
+    let dir = data_dir(game);
+    if STARTED.with_borrow(|s| *s) {
+        if DATA_DIR.with_borrow(|d| d.as_ref() == Some(&dir)) {
+            return;
+        }
+        // None while a call holds it: that call's world is this one, so nothing to switch from yet.
+        let Some(mut old) = ESS.with_borrow_mut(Option::take) else { return };
+        old.users.save();
+        ONLINE.with_borrow_mut(Vec::clear);
+        QUEUE.with_borrow_mut(Vec::clear);
+    }
+    ESS.with_borrow_mut(|slot| *slot = Some(Ess::new(&dir)));
+    STARTED.with_borrow_mut(|s| *s = true);
+    DATA_DIR.with_borrow_mut(|d| *d = Some(dir));
+}
+
 /// A command typed by a player or the console, before vanilla's dispatcher. The client also reaches
-/// `native_command` before sending a command to its server, so only a server-side game claims it.
+/// `native_command` before sending a command to its server, so only a game serving its world claims it.
 pub(super) fn on_command(game: &mut super::Game<'_>, command: &str, ran: &mut bool) {
-    if game.native_window() || RUNNING_VANILLA.with_borrow(|r| *r) {
+    if !serves(game) || RUNNING_VANILLA.with_borrow(|r| *r) {
         return;
     }
     // A console command may come before the first tick: start Essentials here then.
-    let dir = data_dir(game);
-    ESS.with_borrow_mut(|slot| {
-        if slot.is_none() && !STARTED.with_borrow(|s| *s) {
-            *slot = Some(Ess::new(&dir));
-            STARTED.with_borrow_mut(|s| *s = true);
-        }
-    });
+    ensure_started(game);
     let claims = ESS.with_borrow(|ess| ess.as_ref().is_some_and(|e| e.claims(command)));
     if !claims {
         return;
     }
-    let sender = match game.lan_acting_uuid {
-        Some(uuid) => Sender::Player(uuid),
-        None => Sender::Console,
-    };
+    let host = host_uuid(game);
+    let sender = ess_core::command_sender(game.lan_acting_uuid, host);
     QUEUE.with_borrow_mut(|q| q.push((sender, command.to_string())));
     *ran = true;
 }
 
 /// Once per server tick: start Essentials, notice joins and quits, run queued commands, tick.
 pub(super) fn on_tick(game: &mut super::Game<'_>) {
-    if game.native_window() {
+    if !serves(game) {
         return;
     }
-    let started = STARTED.with_borrow(|s| *s);
-    let Some(mut ess) = ESS.with_borrow_mut(Option::take).or_else(|| (!started).then(|| Ess::new(&data_dir(game)))) else {
+    ensure_started(game);
+    let Some(mut ess) = ESS.with_borrow_mut(Option::take) else {
         return;
     };
-    STARTED.with_borrow_mut(|s| *s = true);
     {
         let mut host = GameHost { game: &mut *game };
         let online = host.online();
@@ -87,7 +113,7 @@ pub(super) fn on_tick(game: &mut super::Game<'_>) {
 /// Runs `f` with the running Essentials and a host over `game` (for area hooks: chat, death, blocks...).
 /// None before Essentials started or while another Essentials call is in progress.
 pub(super) fn with_ess<T>(game: &mut super::Game<'_>, f: impl FnOnce(&mut Ess, &mut GameHost) -> T) -> Option<T> {
-    if game.native_window() {
+    if !serves(game) {
         return None;
     }
     let mut ess = ESS.with_borrow_mut(Option::take)?;
@@ -99,12 +125,18 @@ pub(super) fn with_ess<T>(game: &mut super::Game<'_>, f: impl FnOnce(&mut Ess, &
     Some(out)
 }
 
-/// `<server>/essentials` on a dedicated server, `<world>/essentials` for a world's own server.
+/// `<server>/essentials` on a dedicated server, `<world>/essentials` in single player.
 fn data_dir(game: &super::Game<'_>) -> std::path::PathBuf {
-    if game.options.dedicated.is_some() {
-        std::env::current_dir().unwrap_or_default().join("essentials")
+    server_root(game).join("essentials")
+}
+
+/// The dedicated server's folder, or the singleplayer world's. (Not `options.dedicated`: single player's server
+/// thread sets it too.)
+fn server_root(game: &super::Game<'_>) -> std::path::PathBuf {
+    if game.options.execution_role == super::execution_role::ExecutionRole::DedicatedServer {
+        std::env::current_dir().unwrap_or_default()
     } else {
-        game.world_root.join("essentials")
+        game.world_root.clone()
     }
 }
 
@@ -168,6 +200,14 @@ impl GameHost<'_, '_> {
     pub(super) fn conn(&self, player: Uuid) -> Option<u32> {
         self.guest(player).map(|g| g.conn)
     }
+    /// Whether `player` is the window's own player, in a world running in the frame.
+    pub(super) fn is_host(&mut self, player: Uuid) -> bool {
+        host_uuid(self.game) == Some(player)
+    }
+    /// Whether `player` owns this singleplayer world: the in-frame host, or the server thread's owner guest.
+    fn is_owner(&mut self, player: Uuid) -> bool {
+        self.is_host(player) || self.game.serving.as_ref().is_some_and(|s| s.owner == player)
+    }
     /// Runs a vanilla command line with the hook kept out (Essentials overrides several vanilla names).
     pub(super) fn vanilla<T>(&mut self, f: impl FnOnce(&mut super::Game<'_>) -> T) -> T {
         RUNNING_VANILLA.with_borrow_mut(|r| *r = true);
@@ -183,21 +223,38 @@ impl Host for GameHost<'_, '_> {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64)
     }
     fn online(&mut self) -> Vec<Uuid> {
-        self.hub().map(|h| h.guests.iter().filter(|g| g.placed).map(|g| g.uuid).collect()).unwrap_or_default()
+        let mut online: Vec<Uuid> = self.hub().map(|h| h.guests.iter().filter(|g| g.placed).map(|g| g.uuid).collect()).unwrap_or_default();
+        online.extend(host_uuid(self.game));
+        online
     }
     fn name(&mut self, player: Uuid) -> Option<String> {
+        if self.is_host(player) {
+            return Some(self.game.options.player_name());
+        }
         self.hub()?.guests.iter().find(|g| g.uuid == player).map(|g| g.name.clone())
     }
     fn lookup(&mut self, name: &str) -> Option<(Uuid, String)> {
         if let Some(g) = self.hub().and_then(|h| h.guests.iter().find(|g| g.name.eq_ignore_ascii_case(name))) {
             return Some((g.uuid, g.name.clone()));
         }
+        if let Some(host) = host_uuid(self.game) {
+            let own = self.game.options.player_name();
+            if own.eq_ignore_ascii_case(name) {
+                return Some((host, own));
+            }
+        }
         self.admin_lookup(name)
     }
     fn op_level(&mut self, player: Uuid) -> u8 {
+        if self.is_owner(player) {
+            return ess_core::HOST_OP_LEVEL;
+        }
         self.guest(player).map_or(0, |g| g.permission)
     }
     fn address(&mut self, player: Uuid) -> Option<String> {
+        if self.is_host(player) {
+            return Some("127.0.0.1".to_string());
+        }
         self.guest(player).map(|g| g.address.ip().to_string())
     }
     fn kick(&mut self, player: Uuid, reason: &[Span]) {
@@ -216,6 +273,9 @@ impl Host for GameHost<'_, '_> {
                     ::log::info!("[Essentials] {line}");
                 }
             }
+            Sender::Player(p) if self.is_host(p) => {
+                self.game.system_message(horizon_client::scoreboard::comp_text(&component(text)));
+            }
             Sender::Player(p) => {
                 let content = nbt(text);
                 if let (Some(conn), Some(hub)) = (self.conn(p), self.hub()) {
@@ -225,16 +285,38 @@ impl Host for GameHost<'_, '_> {
         }
     }
     fn action_bar(&mut self, player: Uuid, text: &[Span]) {
+        if self.is_host(player) {
+            self.game.titles.set_overlay(horizon_client::scoreboard::comp_text(&component(text)), false);
+            return;
+        }
         let content = nbt(text);
         if let (Some(conn), Some(hub)) = (self.conn(player), self.hub()) {
             hub.send_to(conn, &C::SystemChat(play::SystemChat { content, overlay: true }));
         }
     }
     fn location(&mut self, player: Uuid) -> Option<Loc> {
+        if self.is_host(player) {
+            // During a guest's turn `game.player` holds that guest.
+            if self.game.lan_acting_uuid.is_some() {
+                return None;
+            }
+            let world = self.game.dim.id().to_owned();
+            let p = self.game.player.as_ref()?;
+            return Some(Loc { world, x: p.position.x, y: p.position.y, z: p.position.z, yaw: p.yaw, pitch: p.pitch });
+        }
         let g = self.guest(player)?;
         Some(Loc { world: g.dimension.clone(), x: g.position[0], y: g.position[1], z: g.position[2], yaw: g.yaw, pitch: g.pitch })
     }
     fn teleport(&mut self, player: Uuid, to: &Loc) -> bool {
+        if self.is_host(player) {
+            // During a guest's turn `@s` would be that guest.
+            if self.game.lan_acting_uuid.is_some() {
+                return false;
+            }
+            // Vanilla's teleport handles the window's level switch, in any dimension. Its feedback stays out of chat.
+            let line = format!("execute in {} run tp @s {} {} {} {} {}", to.world, to.x, to.y, to.z, to.yaw, to.pitch);
+            return self.console_command(&line).0;
+        }
         let Some(i) = self.index(player) else { return false };
         let at = [to.x, to.y, to.z];
         let same = self.hub().is_some_and(|h| h.guests[i].dimension == to.world);
@@ -265,6 +347,12 @@ impl Host for GameHost<'_, '_> {
         })
     }
     fn player_command(&mut self, player: Uuid, line: &str, op: bool) -> (bool, Vec<String>) {
+        if self.is_host(player) {
+            // The window's commands run as its player, their feedback on its chat.
+            let line = line.trim_start_matches('/').to_string();
+            let ok = self.vanilla(|g| if op { g.as_console(|g| g.run_command(&line)) } else { g.run_command(&line) });
+            return (ok, Vec::new());
+        }
         let Some(g) = self.guest(player) else { return (false, Vec::new()) };
         let command = super::lan_actions::GuestCommand {
             conn: g.conn,
@@ -277,7 +365,7 @@ impl Host for GameHost<'_, '_> {
         (ok, Vec::new())
     }
     fn server_dir(&mut self) -> std::path::PathBuf {
-        std::env::current_dir().unwrap_or_default()
+        server_root(self.game)
     }
 
     // ----- Area: tp (mixins/ess-tp/ess_glue_tp.rs) ----------------------------------------------------
