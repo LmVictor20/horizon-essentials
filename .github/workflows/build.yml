@@ -10,7 +10,7 @@ name: Build server
 
 on:
   push:
-    branches: [main]
+    branches: [main, "test/*"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
