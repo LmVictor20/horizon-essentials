@@ -55,6 +55,14 @@ chmod +x horizon-engine-essentials
 ./horizon-engine-essentials --resources resources --dedicated --nogui --port 25565
 ```
 
+### Option C: Horizon Launcher / Singleplayer (`.hnmod`)
+
+To use Essentials in singleplayer or with launcher builds:
+1. Download `horizon_essentials.hnmod` from the [latest release](../../releases/latest).
+2. Place it in your instance's `horizon-native-mods/` directory (or install it via the launcher mod browser).
+3. Ensure it is enabled in `horizon-mods.txt`.
+4. Launch the game; Essentials activates automatically and stores data under `<world>/essentials/`.
+
 ### First steps on the new server
 
 Minecraft 26.3 turns the whitelist on by default. In the server console:
@@ -144,6 +152,13 @@ Tests:
 cargo test --workspace         # about 390 tests, a few seconds
 python3 tools/horizon.py test  # the same tests inside Horizon
 python3 tools/e2e/run.py       # a real server with test players
+```
+
+Packaging native mod archives (`.hnmod`):
+
+```sh
+python3 tools/pack.py          # creates all-in-one and modular .hnmod packages in dist/
+python3 tools/pack.py --verify-engine  # also validates with Horizon's native bundle reader
 ```
 
 Every push is built and tested by GitHub Actions, and pushing a `v*` tag publishes a release.

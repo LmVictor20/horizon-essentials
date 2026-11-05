@@ -1,5 +1,7 @@
 /target/
 /.worktrees/
+/dist/
+*.hnmod
 __pycache__/
 *.pyc
 /.claude/

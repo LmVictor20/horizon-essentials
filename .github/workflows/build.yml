@@ -95,6 +95,7 @@ jobs:
         working-directory: horizon-essentials
         run: |
           mkdir -p dist
+          python3 tools/pack.py
           cp target/horizon-cargo/fast/horizon-client dist/horizon-engine-essentials
           strip dist/horizon-engine-essentials
           need=$(objdump -T dist/horizon-engine-essentials | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -Vu | tail -1)
