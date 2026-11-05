@@ -304,6 +304,12 @@ def package_all_in_one(out_dir: Path, compat: dict, versioned: bool = False) -> 
         for m in toml_data.get("module", []):
             combined_modules.append(m)
         for st in toml_data.get("state", []):
+            st = st.copy()
+            # If combining into horizon_essentials, rename state id "ess" -> "social_ess"
+            # so the generated method name __horizon_mixins_<mod>_<state>() matches
+            # __horizon_mixins_horizon_essentials_social_ess() expected by ess-social hooks
+            if area == "ess-social" and st.get("id") == "ess":
+                st["id"] = "social_ess"
             combined_states.append(st)
 
         for inj in toml_data.get("injection", []):
