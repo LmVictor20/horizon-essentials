@@ -24,44 +24,63 @@ Edition 26.3.
 mostly where Horizon itself can't do something yet (for example, vanished players are invisible but still
 there). The full list, with the reason for each gap, is in [PARITY.md](PARITY.md).
 
-## Install
+## Installation
 
-Download `horizon-engine-essentials` from the [latest release](../../releases/latest). It runs on any 64-bit
-Linux server (Debian 12, Ubuntu 22.04 or newer).
+Choose your setup below:
 
-You also need Horizon's **game files**, prepared from your own copy of Minecraft with the
-[Horizon launcher](https://playhorizon.dev). Nobody can ship them for you.
+---
 
-### Option A: Pterodactyl panel (easiest)
+### 🎮 Singleplayer & Client (Horizon Launcher)
 
-1. Set up a normal Horizon server with **[horizon-egg](https://github.com/LmVictor20/horizon-egg)**. Its guide
-   walks you through importing the egg and uploading the game files.
-2. Upload `horizon-engine-essentials` to the server's main folder and give it permission `755`.
-3. In the server's **Startup** tab, change the command to:
-   ```
-   ./horizon-engine-essentials --resources {{RESOURCES_DIR}} --dedicated --nogui --port {{SERVER_PORT}}
-   ```
-4. Start the server. Type `ping` in the console: it answers `Pong!`.
+Use all Essentials commands directly in your singleplayer worlds and local LAN games:
 
-Keep the file name `horizon-engine-essentials`: reinstalling the egg replaces `horizon-engine`, never this file.
+1. **Download the mod**:
+   Grab **`horizon_essentials.hnmod`** from the [latest release](../../releases/latest).
+2. **Put it in your mods folder**:
+   In the Horizon launcher, open your instance's **`mods/`** directory and drop `horizon_essentials.hnmod` inside.
+3. **Enable & build**:
+   * Open launcher **Settings** → **Game** → toggle on **Native mods (experimental)**.
+   * Click **Build** (confirm *"I trust these mods: build"*). The launcher compiles the mod into an instance build.
+4. **Play**:
+   * Click **Play** and launch/create any singleplayer world.
+   * You automatically receive full operator permissions (OP level 4).
+   * Data (homes, warps, kits, economy) is stored safely inside that world: `<world>/essentials/`.
+   * **Open to LAN** works out-of-the-box for friends joining your world!
 
-### Option B: any Linux server
+---
 
-In an empty folder, put `horizon-engine-essentials`, your game files in `resources/`, and a file `eula.txt`
-containing `eula=true` (you accept the [Minecraft EULA](https://aka.ms/MinecraftEULA)). Then:
+### 🖥️ Dedicated Servers (For Server Owners)
+
+Players join with unmodified vanilla **Minecraft: Java Edition 26.3** clients (no mods or Java required on their end).
+
+#### Option A: Pterodactyl Panel (Recommended & Easiest)
+
+1. Set up a normal Horizon server using **[horizon-egg](https://github.com/LmVictor20/horizon-egg)**.
+2. Download **`horizon-engine-essentials`** from the [latest release](../../releases/latest).
+3. Upload `horizon-engine-essentials` to the server root (`/mnt/server/`) and ensure executable permissions (`chmod +x horizon-engine-essentials`).
+4. In the Pterodactyl server's **Startup** tab:
+   * Set **Engine program**: `./horizon-engine-essentials`
+   * Set **Keep my own horizon-engine**: `1`
+5. Start the server! Type `ping` in the console: it answers `Pong!`.
+
+#### Option B: Standalone Linux Server
+
+In an empty folder, place `horizon-engine-essentials`, your game files in `resources/` (prepared via the Horizon launcher), and a file `eula.txt` with `eula=true` to accept the [Minecraft EULA](https://aka.ms/MinecraftEULA):
 
 ```sh
 chmod +x horizon-engine-essentials
 ./horizon-engine-essentials --resources resources --dedicated --nogui --port 25565
 ```
 
-### Option C: Horizon Launcher / Singleplayer (`.hnmod`)
+#### Option C: Build the Server Engine from `.hnmod`
 
-To use Essentials in singleplayer or with launcher builds:
-1. Download `horizon_essentials.hnmod` from the [latest release](../../releases/latest).
-2. Place it in your instance's `horizon-native-mods/` directory (or install it via the launcher mod browser).
-3. Ensure it is enabled in `horizon-mods.txt`.
-4. Launch the game; Essentials activates automatically and stores data under `<world>/essentials/`.
+If you want the launcher to compile the dedicated server binary from the `.hnmod` bundle:
+
+```sh
+horizon-launcher native-build horizon_essentials.hnmod --server-output ~/server-export --trust-native-code
+```
+
+Then pack `~/server-export` and upload it to your server as described in the `horizon-egg` guide.
 
 ### First steps on the new server
 
