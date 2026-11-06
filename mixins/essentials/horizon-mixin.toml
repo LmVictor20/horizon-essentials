@@ -2,7 +2,7 @@
 # its own bundle in mixins/ess-<area>/ (its modules and hooks), so areas never edit this file.
 [mod]
 id = "horizon-essentials"
-version = "0.1.0"
+version = "0.2.0"
 priority = 100
 
 [compatibility]
