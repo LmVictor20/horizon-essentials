@@ -39,7 +39,7 @@ jobs:
           curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: horizon-essentials
 
@@ -51,18 +51,18 @@ jobs:
           echo "mixins=$(jq -r .horizon_mixins_revision compatibility.json)" >> "$GITHUB_OUTPUT"
 
       # tools/horizon.py finds these beside this repository.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: horizon-rust/horizon
           ref: ${{ steps.pins.outputs.horizon }}
           path: horizon
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: horizon-rust/horizon-mixins
           ref: ${{ steps.pins.outputs.mixins }}
           path: horizon-mixins
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -113,15 +113,27 @@ jobs:
           (cd dist && sha256sum horizon-engine-essentials horizon_essentials.hnmod > SHA256SUMS)
           cat dist/BUILD-INFO.txt dist/SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload native mod (.hnmod)
+        uses: actions/upload-artifact@v7
+        with:
+          name: horizon_essentials.hnmod
+          path: horizon-essentials/dist/horizon_essentials.hnmod
+          archive: false
+          if-no-files-found: error
+
+      - name: Upload dedicated server binary
+        uses: actions/upload-artifact@v7
         with:
           name: horizon-engine-essentials
-          path: horizon-essentials/dist/*
+          path: |
+            horizon-essentials/dist/horizon-engine-essentials
+            horizon-essentials/dist/BUILD-INFO.txt
+            horizon-essentials/dist/SHA256SUMS
           if-no-files-found: error
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: horizon-essentials/dist/*
           generate_release_notes: true
