@@ -22,7 +22,7 @@ impl GameHost<'_, '_> {
         if dim.id() != world {
             return None;
         }
-        self.game.levels.parked_chunks().find(|(d, _)| *d == dim).and_then(|(_, chunks)| chunks.get(&key).cloned())
+        super::levels::ess_levels::parked_chunk(&self.game.levels, dim, key)
     }
 
     /// `minecraft:oak_log[axis=y]`.

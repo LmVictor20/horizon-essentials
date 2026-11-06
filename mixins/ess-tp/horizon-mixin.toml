@@ -20,6 +20,14 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_tp"
 source = "ess_glue_tp.rs"
 
+# Levels compatibility helper for parked level chunk and mob access.
+[[module]]
+id = "levels-compat"
+file = "crates/horizon-client/src/game/levels.rs"
+name = "ess_levels"
+source = "ess_levels.rs"
+visibility = "pub"
+
 # This area's injections go below ([[injection]] entries with helpers in this folder).
 
 # No injections: deaths and respawns are polled through Host::is_dead (see ess_glue_tp.rs).

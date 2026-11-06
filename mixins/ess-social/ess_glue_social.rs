@@ -1,40 +1,35 @@
 // horizon-essentials glue for area `social` (game only): `crate::game::ess_glue_social`.
 // The Host methods this area owns, over Horizon's Game and hub (ess_glue delegates them here), and the tick that
 // serves this area's hub hooks. The hub (horizon_client library) and this glue (game binary) share the per-hub
-// state declared in horizon-mixin.toml: `.0` JSON (on, join, quit, bypass, display, tab, seen, tree, orig) and `.1`
+// state in ess_social_hub: JSON (on, join, quit, bypass, display, tab, seen, tree, orig) and
 // the chat messages held for Essentials.
 
 use super::ess_glue::{GameHost, component, nbt, with_ess};
 use crate::game::ess_core::*;
 use horizon_protocol::packets::play::{self, Clientbound as C};
 use serde_json::{Value, json};
+use horizon_client::lan::hub::ess_social_hub::with_state;
 
 fn key(u: Uuid) -> String {
     format!("{u:032x}")
 }
 
-/// The JSON half of the shared hub state, made an object.
-fn shared(hub: &mut horizon_client::lan::hub::Hub) -> &mut Value {
-    let state = &mut hub.__horizon_mixins_horizon_essentials_social_ess_mut().0;
-    if !state.is_object() {
-        *state = json!({});
-    }
-    state
-}
-
-fn put(map: &mut Value, field: &str, player: Uuid, value: Option<Value>) {
-    if !map[field].is_object() {
-        map[field] = json!({});
-    }
-    let k = key(player);
-    match value {
-        Some(v) => map[field][k] = v,
-        None => {
-            if let Some(m) = map[field].as_object_mut() {
-                m.remove(&k);
+fn put(field: &str, player: Uuid, value: Option<Value>) {
+    with_state(|state| {
+        let map = &mut state.json;
+        if !map[field].is_object() {
+            map[field] = json!({});
+        }
+        let k = key(player);
+        match value {
+            Some(v) => map[field][k] = v,
+            None => {
+                if let Some(m) = map[field].as_object_mut() {
+                    m.remove(&k);
+                }
             }
         }
-    }
+    });
 }
 
 /// Every tick after the core's: the chat held by the hub hook goes through Essentials, the command tree gets
@@ -72,14 +67,14 @@ impl GameHost<'_, '_> {
     }
     /// The chat sender name (`Hub::player_display_name` hook): the spans of the display name.
     pub(super) fn social_set_display_name(&mut self, player: Uuid, name: Option<&[Span]>) {
-        let Some(hub) = self.hub_mut() else { return };
+        let Some(_hub) = self.hub_mut() else { return };
         let extra = name.map(|spans| component(spans).get("extra").cloned().unwrap_or_else(|| json!([])));
-        put(shared(hub), "display", player, extra);
+        put("display", player, extra);
     }
     /// The tab list name: kept for joiners (`Hub::player_info` hook) and sent to everyone now.
     pub(super) fn social_set_tab_name(&mut self, player: Uuid, name: Option<&[Span]>) {
         let Some(hub) = self.hub_mut() else { return };
-        put(shared(hub), "tab", player, name.map(component));
+        put("tab", player, name.map(component));
         let entry = play::PlayerInfo { uuid: player, display_name: Some(name.map(nbt)), ..Default::default() };
         hub.broadcast(&C::PlayerInfoUpdate(play::PlayerInfoUpdate { actions: 0x20, entries: vec![entry] }));
     }
@@ -90,45 +85,51 @@ impl GameHost<'_, '_> {
         let join = crate::game::ess_social::join_messages_replaced(ess);
         let quit = crate::game::ess_social::quit_messages_replaced(ess);
         let Some(hub) = self.hub_mut() else { return };
-        let state = shared(hub);
-        state["on"] = json!(true);
-        state["join"] = json!(join);
-        state["quit"] = json!(quit);
-        if !state["tree"].is_object() {
-            state["tree"] = crate::game::ess_social::command_tree(ess);
-            let orig = state["orig"].clone();
+        let (tree_to_set, orig, update_entries) = with_state(|state| {
+            state.json["on"] = json!(true);
+            state.json["join"] = json!(join);
+            state.json["quit"] = json!(quit);
+            let mut tree_to_set = false;
+            let mut orig = Value::Null;
+            if !state.json["tree"].is_object() {
+                state.json["tree"] = crate::game::ess_social::command_tree(ess);
+                orig = state.json["orig"].clone();
+                tree_to_set = true;
+            }
+            let online: Vec<Value> = hub.guests.iter().filter(|g| g.placed).map(|g| json!(key(g.uuid))).collect();
+            let mut update_entries = Vec::new();
+            if state.json["seen"] != json!(online) {
+                state.json["seen"] = json!(online);
+                if let Some(m) = state.json["tab"].as_object() {
+                    for (k, v) in m {
+                        if let Ok(uuid) = u128::from_str_radix(k, 16) {
+                            update_entries.push(play::PlayerInfo {
+                                uuid,
+                                display_name: Some(Some(horizon_client::lan::data::component_nbt(v))),
+                                ..Default::default()
+                            });
+                        }
+                    }
+                }
+            }
+            (tree_to_set, orig, update_entries)
+        });
+        if tree_to_set {
             let key = hub.mod_commands_key().unwrap_or(u64::MAX);
             hub.set_mod_commands(key, orig);
         }
-        // Players who joined got the tab list without Essentials' names: send them again when the list changes.
-        let online: Vec<Value> = hub.guests.iter().filter(|g| g.placed).map(|g| json!(key(g.uuid))).collect();
-        let state = shared(hub);
-        if state["seen"] != json!(online) {
-            state["seen"] = json!(online);
-            let entries: Vec<play::PlayerInfo> = state["tab"]
-                .as_object()
-                .map(|m| {
-                    m.iter()
-                        .filter_map(|(k, v)| {
-                            let uuid = u128::from_str_radix(k, 16).ok()?;
-                            Some(play::PlayerInfo { uuid, display_name: Some(Some(horizon_client::lan::data::component_nbt(v))), ..Default::default() })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            if !entries.is_empty() {
-                hub.broadcast(&C::PlayerInfoUpdate(play::PlayerInfoUpdate { actions: 0x20, entries }));
-            }
+        if !update_entries.is_empty() {
+            hub.broadcast(&C::PlayerInfoUpdate(play::PlayerInfoUpdate { actions: 0x20, entries: update_entries }));
         }
-        let pending = std::mem::take(&mut hub.__horizon_mixins_horizon_essentials_social_ess_mut().1);
+        let pending = with_state(|s| std::mem::take(&mut s.pending));
         for (message, bound, line) in pending {
             match ess.on_chat(self, message.sender, &message.content) {
                 Chat::Pass => {
                     let mut events = Vec::new();
                     if let Some(hub) = self.hub_mut() {
-                        shared(hub)["bypass"] = json!(true);
+                        with_state(|s| s.json["bypass"] = json!(true));
                         hub.broadcast_chat(&message, &bound, line, &mut events);
-                        shared(hub)["bypass"] = json!(false);
+                        with_state(|s| s.json["bypass"] = json!(false));
                     }
                     for event in events {
                         self.game.lan_log_event(event);

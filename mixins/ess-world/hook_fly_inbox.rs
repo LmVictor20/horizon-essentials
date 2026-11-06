@@ -1,8 +1,22 @@
 // HEAD of Hub::tick_level, before the inboxes are processed: a survival player Essentials lets fly starts and
 // stops flying with their client (handlePlayerAbilities only accepts creative and spectator flight).
 fn ess_fly_inbox(hub: &mut Hub) {
+    trait AsServerbound {
+        fn as_serverbound(&self) -> &play::Serverbound;
+    }
+    impl AsServerbound for play::Serverbound {
+        fn as_serverbound(&self) -> &play::Serverbound {
+            self
+        }
+    }
+    impl AsServerbound for (play::Serverbound, usize) {
+        fn as_serverbound(&self) -> &play::Serverbound {
+            &self.0
+        }
+    }
+
     for g in hub.guests.iter_mut() {
-        if g.creative() || g.spectator() || g.inbox.iter().all(|p| !matches!(p, S::PlayerAbilities(_))) {
+        if g.creative() || g.spectator() || g.inbox.iter().all(|p| !matches!(p.as_serverbound(), S::PlayerAbilities(_))) {
             continue;
         }
         let allowed = g
@@ -13,7 +27,7 @@ fn ess_fly_inbox(hub: &mut Hub) {
             continue;
         }
         let mut flying = g.flying;
-        g.inbox.retain(|p| match p {
+        g.inbox.retain(|p| match p.as_serverbound() {
             S::PlayerAbilities(a) => {
                 flying = a.flags & 2 != 0;
                 false

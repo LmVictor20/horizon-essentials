@@ -57,13 +57,7 @@ impl GameHost<'_, '_> {
         let tiles: usize = self.game.world.chunks.values().map(|c| c.block_entities.len()).sum();
         worlds.push((here, self.game.world.chunks.len() as u32, self.game.mobs.len() as u32, tiles as u32));
         for dim in self.game.levels.parked_dims() {
-            let entities = self.game.levels.parked_mut(dim).map_or(0, |p| p.mobs.len());
-            let (chunks, tiles) = self
-                .game
-                .levels
-                .parked_chunks()
-                .find(|(d, _)| *d == dim)
-                .map_or((0, 0), |(_, c)| (c.len(), c.values().map(|c| c.block_entities.len()).sum::<usize>()));
+            let (entities, chunks, tiles) = super::levels::ess_levels::parked_stats(&self.game.levels, dim);
             worlds.push((dim.id().to_string(), chunks as u32, entities as u32, tiles as u32));
         }
         ServerStats {

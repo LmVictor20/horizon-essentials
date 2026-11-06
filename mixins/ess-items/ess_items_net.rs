@@ -3,7 +3,8 @@
 // item meta Essentials writes (/itemlore, /skull, kits' `unbreakable` and `custom-model-data`) needs these on
 // the client too: Hub::stack's HEAD hook (inventories and menus) builds the stack as usual, then adds them.
 
-use horizon_protocol::item::{Component, Profile, Stack, component};
+use horizon_protocol::buf::Writer;
+use horizon_protocol::item::{Component, Stack, component};
 use horizon_world::nbt::Tag;
 use std::cell::Cell;
 use std::ops::ControlFlow;
@@ -45,21 +46,48 @@ fn list(t: Option<&Tag>) -> Vec<Tag> {
     }
 }
 
-/// `ResolvableProfile`: a name, or {name, id, properties}.
-fn profile(t: &Tag) -> Option<Profile> {
-    if let Some(name) = string(t) {
-        return Some(Profile { name: Some(name), id: None, properties: Vec::new() });
-    }
-    let name = t.get("name").and_then(string);
-    let id = match t.get("id") {
-        Some(Tag::IntArray(a)) if a.len() == 4 => Some(a.iter().fold(0u128, |acc, v| (acc << 32) | u128::from(*v as u32))),
-        _ => None,
+/// `ResolvableProfile`: a name, or {name, id, properties}. Encoded as Component::Raw bytes.
+fn profile_bytes(t: &Tag) -> Option<Vec<u8>> {
+    let (name, id, properties) = if let Some(name) = string(t) {
+        (Some(name), None, Vec::new())
+    } else {
+        let name = t.get("name").and_then(string);
+        let id = match t.get("id") {
+            Some(Tag::IntArray(a)) if a.len() == 4 => Some(a.iter().fold(0u128, |acc, v| (acc << 32) | u128::from(*v as u32))),
+            _ => None,
+        };
+        let properties: Vec<(String, String, Option<String>)> = list(t.get("properties"))
+            .iter()
+            .filter_map(|p| Some((p.get("name").and_then(string)?, p.get("value").and_then(string)?, p.get("signature").and_then(string))))
+            .collect();
+        (name, id, properties)
     };
-    let properties = list(t.get("properties"))
-        .iter()
-        .filter_map(|p| Some((p.get("name").and_then(string)?, p.get("value").and_then(string)?, p.get("signature").and_then(string))))
-        .collect();
-    Some(Profile { name, id, properties })
+    if name.is_none() && id.is_none() && properties.is_empty() {
+        return None;
+    }
+    let mut w = Writer::new();
+    w.u8(0);
+    w.bool(name.is_some());
+    if let Some(name) = &name {
+        w.string(name);
+    }
+    w.bool(id.is_some());
+    if let Some(id) = id {
+        w.uuid(id);
+    }
+    w.varint(properties.len() as i32);
+    for (name, value, signature) in &properties {
+        w.string(name);
+        w.string(value);
+        w.bool(signature.is_some());
+        if let Some(signature) = signature {
+            w.string(signature);
+        }
+    }
+    for _ in 0..4 {
+        w.bool(false);
+    }
+    Some(w.data)
 }
 
 /// The stack as Hub::stack makes it, plus lore, profile, unbreakable and custom_model_data.
@@ -79,8 +107,8 @@ pub(super) fn stack(hub: &mut super::Hub, s: &Option<crate::items::ItemStack>) -
     if let Some(lore) = data.other("minecraft:lore") {
         stack.added.push((component::LORE, Component::Lore(list(Some(lore)))));
     }
-    if let Some(p) = data.other("minecraft:profile").and_then(profile) {
-        stack.added.push((component::PROFILE, Component::Profile(p)));
+    if let Some(bytes) = data.other("minecraft:profile").and_then(profile_bytes) {
+        stack.added.push((component::PROFILE, Component::Raw(bytes)));
     }
     if data.other("minecraft:unbreakable").is_some() {
         stack.added.push((component::UNBREAKABLE, Component::Unit));

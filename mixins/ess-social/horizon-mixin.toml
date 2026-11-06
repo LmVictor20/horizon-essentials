@@ -20,18 +20,13 @@ file = "crates/horizon-client/src/game.rs"
 name = "ess_glue_social"
 source = "ess_glue_social.rs"
 
-# The hub lives in the horizon_client library and the glue in the game binary: they share this per-hub state
-# (public accessors): (flags, display/tab names and the command tree as JSON; chats waiting for Essentials).
-[[state]]
-id = "ess"
-target = "horizon_client::lan::hub::Hub"
-ty = "(serde_json::Value, Vec<(chat::ChatMessage, horizon_protocol::packets::play::ChatTypeBound, String)>)"
-initial = "::core::default::Default::default()"
-
-[[state.constructor]]
-target = "horizon_client::lan::hub::Hub::new"
-selector = "Self"
-require = 1
+# Shared hub state for social hooks (in lan/hub.rs) and GameHost glue (in game.rs).
+[[module]]
+id = "social-hub-state"
+file = "crates/horizon-client/src/lan/hub.rs"
+name = "ess_social_hub"
+source = "ess_social_hub.rs"
+visibility = "pub"
 
 # Player chat waits for Essentials (EssentialsChat formats, local/shout, mute, ignore). handle_chat itself is
 # never cancelled, so the secure chat chain advances; only the broadcast is held until the next tick.

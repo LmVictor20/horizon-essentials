@@ -54,6 +54,76 @@ thread_local! {
     static STASHED: RefCell<Vec<(u32, super::lan_stations::GuestStation)>> = const { RefCell::new(Vec::new()) };
 }
 
+struct WrapOpen<T>(T);
+
+trait Dispatch7 {
+    fn call_open(
+        &self,
+        hub: &mut horizon_client::lan::hub::Hub,
+        conn: u32,
+        menu: &str,
+        title: horizon_world::nbt::Tag,
+        pos: (i32, i32, i32),
+        slots: Slots,
+        items: Vec<Option<ItemStack>>,
+    );
+}
+
+impl<F: Fn(&mut horizon_client::lan::hub::Hub, u32, &str, horizon_world::nbt::Tag, (i32, i32, i32), Slots, Vec<Option<ItemStack>>, Option<Vec<u8>>)> Dispatch7 for WrapOpen<F> {
+    fn call_open(
+        &self,
+        hub: &mut horizon_client::lan::hub::Hub,
+        conn: u32,
+        menu: &str,
+        title: horizon_world::nbt::Tag,
+        pos: (i32, i32, i32),
+        slots: Slots,
+        items: Vec<Option<ItemStack>>,
+    ) {
+        (self.0)(hub, conn, menu, title, pos, slots, items, None);
+    }
+}
+
+trait Dispatch6 {
+    fn call_open(
+        &self,
+        hub: &mut horizon_client::lan::hub::Hub,
+        conn: u32,
+        menu: &str,
+        title: horizon_world::nbt::Tag,
+        pos: (i32, i32, i32),
+        slots: Slots,
+        items: Vec<Option<ItemStack>>,
+    );
+}
+
+impl<F: Fn(&mut horizon_client::lan::hub::Hub, u32, &str, horizon_world::nbt::Tag, (i32, i32, i32), Slots, Vec<Option<ItemStack>>)> Dispatch6 for &WrapOpen<F> {
+    fn call_open(
+        &self,
+        hub: &mut horizon_client::lan::hub::Hub,
+        conn: u32,
+        menu: &str,
+        title: horizon_world::nbt::Tag,
+        pos: (i32, i32, i32),
+        slots: Slots,
+        items: Vec<Option<ItemStack>>,
+    ) {
+        (self.0)(hub, conn, menu, title, pos, slots, items);
+    }
+}
+
+fn hub_open_container(
+    hub: &mut horizon_client::lan::hub::Hub,
+    conn: u32,
+    menu: &str,
+    title: horizon_world::nbt::Tag,
+    pos: (i32, i32, i32),
+    slots: Slots,
+    items: Vec<Option<ItemStack>>,
+) {
+    (&WrapOpen(horizon_client::lan::hub::Hub::open_container)).call_open(hub, conn, menu, title, pos, slots, items);
+}
+
 fn ns(id: &str) -> String {
     if id.contains(':') { id.to_string() } else { format!("minecraft:{id}") }
 }
@@ -203,7 +273,7 @@ impl GameHost<'_, '_> {
         let opened = self.in_level(&dim, |game| {
             game.world.block_entities.insert(key, BlockEntity::Chest(items.clone()));
             let Some(lan) = game.lan.as_mut() else { return None };
-            lan.hub.open_container(conn, &menu, title, key, Slots::Block(key), items);
+            hub_open_container(&mut lan.hub, conn, &menu, title, key, Slots::Block(key), items);
             let window = lan.hub.guest(conn).and_then(|g| g.menu.as_ref().filter(|m| m.pos == Some(key)).map(|m| m.window));
             if window.is_none() {
                 game.world.block_entities.remove(&key);
@@ -232,7 +302,7 @@ impl GameHost<'_, '_> {
                 let key = (i32::MAX - 16, VEHICLE_KEY_Y, id);
                 let items = g_ender(self, player);
                 let window = self.hub_mut().and_then(|hub| {
-                    hub.open_container(conn, "minecraft:generic_9x3", horizon_protocol::text::translatable("container.enderchest", &[]), key, Slots::Ender, items);
+                    hub_open_container(hub, conn, "minecraft:generic_9x3", horizon_protocol::text::translatable("container.enderchest", &[]), key, Slots::Ender, items);
                     hub.guest(conn).and_then(|g| g.menu.as_ref().map(|m| m.window))
                 });
                 let Some(window) = window else { return false };
@@ -313,7 +383,14 @@ impl GameHost<'_, '_> {
     pub(super) fn items_recipes(&mut self) -> Vec<Value> {
         use horizon_client::crafting::{Recipe, Special};
         let recipes = self.game.res.recipes();
-        let ing = |i: &horizon_client::crafting::Ingredient| json!(i.1);
+        let ing = |i: &horizon_client::crafting::Ingredient| -> Value {
+            let s = format!("{i:?}");
+            let items: Vec<String> = s.find('[')
+                .and_then(|start| s[start..].find(']').map(|end| &s[start..=start + end]))
+                .and_then(|slice| serde_json::from_str(slice).ok())
+                .unwrap_or_default();
+            json!(items)
+        };
         let result = |t: &horizon_client::crafting::Template| t.item.as_ref().map(|id| json!({"id": id.to_string(), "count": t.count.max(1)}));
         let mut out = Vec::new();
         for (id, r) in &recipes.crafting {

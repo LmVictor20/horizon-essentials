@@ -327,13 +327,9 @@ impl Host for GameHost<'_, '_> {
                 hub.teleport(i, Some(at));
             }
         } else {
-            let conn = self.hub().map(|h| h.guests[i].conn).unwrap_or_default();
-            self.game.level_teleports.push(super::server_travel::LevelTeleport {
-                conn,
-                dim: super::Dim::from_id(&to.world),
-                at,
-                rotation: Some([to.yaw, to.pitch]),
-            });
+            let Some(name) = self.name(player) else { return false };
+            let line = format!("execute in {} run tp {name} {} {} {} {} {}", to.world, at[0], at[1], at[2], to.yaw, to.pitch);
+            return self.console_command(&line).0;
         }
         true
     }
