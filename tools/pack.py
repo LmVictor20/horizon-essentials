@@ -176,7 +176,11 @@ def verify_bundle(path: Path) -> dict:
             continue
         if not name.startswith(prefix):
             raise ValueError(f"Unexpected native source path not under {prefix}: {name}")
-        if not (name.endswith(".rs") or name.endswith(".toml")):
+        rest = name[len(prefix):]
+        parts = rest.split("/")
+        last = parts[-1]
+        is_text = len(parts) <= 2 and any(last.startswith(p) for p in ["README", "LICENSE", "LICENCE", "COPYING", "NOTICE"])
+        if not (rest.endswith(".rs") or rest.endswith(".toml") or is_text):
             raise ValueError(f"Unexpected non-source file in native bundle: {name}")
 
     # Check horizon-mixin.toml
@@ -340,6 +344,12 @@ def package_all_in_one(out_dir: Path, compat: dict, versioned: bool = False) -> 
                     elif area == "ess-social":
                         target_name = "hook_social_tick.rs"
                 files_to_pack[target_name] = f.read_bytes()
+
+    # Include LICENSE and NOTICE in the native bundle
+    if (ROOT / "LICENSE").exists():
+        files_to_pack["LICENSE"] = (ROOT / "LICENSE").read_bytes()
+    if (ROOT / "NOTICE").exists():
+        files_to_pack["NOTICE"] = (ROOT / "NOTICE").read_bytes()
 
     combined_toml = {
         "mod": {

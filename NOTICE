@@ -1,10 +1,15 @@
 horizon-essentials is a port of EssentialsX (https://github.com/EssentialsX/Essentials) to Horizon.
 
-EssentialsX is free software under the GNU General Public License v3.0, copyright the EssentialsX team and
-contributors. Its behaviour, messages (messages*.properties), configuration files (config.yml, kits.yml,
-worth.yml, ...) and command/permission metadata (plugin.yml) are used here, and generated into
-mixins/essentials/ess_messages.rs, ess_defaults.rs and ess_meta.rs by tools/ess-gen.
+EssentialsX is free software under the GNU General Public License v3.0 or later (GPL-3.0-or-later),
+copyright the EssentialsX team and contributors. Its behaviour, messages (messages*.properties),
+configuration files (config.yml, kits.yml, worth.yml, ...) and command/permission metadata (plugin.yml)
+are used here, and generated into mixins/essentials/ess_messages.rs, ess_defaults.rs and ess_meta.rs by tools/ess-gen.
 
 tools/horizon.py is adapted from horizon-native-mod-template (MIT).
 
-This project is distributed under the GNU General Public License v3.0 (LICENSE).
+This project is distributed under the GNU General Public License v3.0 or later (GPL-3.0-or-later, see LICENSE).
+
+Reviewer permission:
+Pursuant to the Horizon Mod Registry Policy (MOD-POLICY.md), permission is hereby granted
+to the Horizon project maintainers and code reviewers to read, inspect, and review the
+source code of this project for registry review and security audit purposes.
