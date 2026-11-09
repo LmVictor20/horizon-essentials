@@ -2280,8 +2280,11 @@ const PLAYER_MOO: [&str; 7] = ["            (__)", "            (oo)", "   /----
 const CONSOLE_MOO: [&str; 7] = ["         (__)", "         (oo)", "   /------\\/", "  / |    ||", " *  /\\---/\\", "    ~~   ~~", "....\"Have you mooed today?\"..."];
 
 fn remove_user(ess: &mut Ess, player: Uuid) {
+    if ess.users.is_broken(player) {
+        return;
+    }
     ess.users.loaded.remove(&player);
-    let _ = std::fs::remove_file(ess.users.dir.join(format!("{}.yml", uuid_string(player))));
+    ess.users.remove_file(player);
     ess.users.names.retain(|_, u| *u != player);
 }
 

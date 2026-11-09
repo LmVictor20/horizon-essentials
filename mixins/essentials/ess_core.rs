@@ -9,7 +9,7 @@
 use crate::game::{ess_meta, ess_messages, ess_text, ess_yaml};
 use serde_json::{Value, json};
 use std::any::{Any, TypeId};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 pub use crate::game::ess_text::{Arg, Span};
@@ -686,6 +686,9 @@ pub struct User {
     pub uuid: Uuid,
     pub data: Value,
     pub dirty: bool,
+    /// Whether this user's file on disk was unreadable or malformed YAML.
+    /// Broken users are kept in-memory only and never written back to disk.
+    pub broken: bool,
 }
 
 impl User {
@@ -720,39 +723,73 @@ pub struct Users {
     pub loaded: HashMap<Uuid, User>,
     /// Lower-case name -> uuid (usermap), from userdata files and joins.
     pub names: BTreeMap<String, Uuid>,
+    /// UUIDs whose userdata files exist on disk but could not be read or parsed.
+    /// Essentials preserves these files and never overwrites or deletes them.
+    pub broken: BTreeSet<Uuid>,
 }
 
 impl Users {
-    fn file(&self, uuid: Uuid) -> PathBuf {
+    pub fn file(&self, uuid: Uuid) -> PathBuf {
         self.dir.join(format!("{}.yml", uuid_string(uuid)))
     }
     pub fn exists(&self, uuid: Uuid) -> bool {
         self.loaded.contains_key(&uuid) || self.file(uuid).exists()
     }
+    pub fn is_broken(&self, uuid: Uuid) -> bool {
+        self.broken.contains(&uuid)
+    }
     /// The user if Essentials has data for them (no new file).
+    ///
+    /// Malformed or unreadable userdata files are preserved on disk and marked broken.
+    /// To prevent data loss, broken files are never overwritten; players can still play
+    /// using an ephemeral in-memory account, while errors are logged once to console.
     pub fn get(&mut self, uuid: Uuid) -> Option<&mut User> {
         if !self.loaded.contains_key(&uuid) {
-            let text = std::fs::read_to_string(self.file(uuid)).ok()?;
-            let data = ess_yaml::parse(&text).unwrap_or(json!({}));
-            self.loaded.insert(uuid, User { uuid, data, dirty: false });
+            if self.broken.contains(&uuid) {
+                return None;
+            }
+            let path = self.file(uuid);
+            if !path.exists() {
+                return None;
+            }
+            let text = match std::fs::read_to_string(&path) {
+                Ok(text) => text,
+                Err(e) => {
+                    if self.broken.insert(uuid) {
+                        eprintln!("[Essentials] Error reading user file {}: {e}", path.display());
+                    }
+                    return None;
+                }
+            };
+            let data = match ess_yaml::parse(&text) {
+                Ok(data) => data,
+                Err(e) => {
+                    if self.broken.insert(uuid) {
+                        eprintln!("[Essentials] Error parsing user file {}: {e}", path.display());
+                    }
+                    return None;
+                }
+            };
+            self.loaded.insert(uuid, User { uuid, data, dirty: false, broken: false });
         }
         self.loaded.get_mut(&uuid)
     }
     /// The user, created if new.
     pub fn user(&mut self, uuid: Uuid) -> &mut User {
-        if self.get(uuid).is_none() {
-            self.loaded.insert(uuid, User { uuid, data: json!({}), dirty: true });
+        if self.get(uuid).is_none() && !self.loaded.contains_key(&uuid) {
+            let broken = self.broken.contains(&uuid);
+            self.loaded.insert(uuid, User { uuid, data: json!({}), dirty: !broken, broken });
         }
         self.loaded.get_mut(&uuid).expect("just inserted")
     }
-    /// Every uuid with a userdata file or in memory.
+    /// Every uuid with a userdata file or in memory (excluding broken files).
     pub fn all(&self) -> Vec<Uuid> {
-        let mut out: Vec<Uuid> = self.loaded.keys().copied().collect();
+        let mut out: Vec<Uuid> = self.loaded.keys().copied().filter(|u| !self.broken.contains(u)).collect();
         if let Ok(dir) = std::fs::read_dir(&self.dir) {
             for e in dir.flatten() {
                 let name = e.file_name().to_string_lossy().to_string();
                 if let Some(u) = name.strip_suffix(".yml").and_then(parse_uuid) {
-                    if !out.contains(&u) {
+                    if !self.broken.contains(&u) && !out.contains(&u) {
                         out.push(u);
                     }
                 }
@@ -764,13 +801,34 @@ impl Users {
     pub fn save(&mut self) {
         let _ = std::fs::create_dir_all(&self.dir);
         let dir = self.dir.clone();
-        for user in self.loaded.values_mut().filter(|u| u.dirty) {
+        for user in self.loaded.values_mut().filter(|u| u.dirty && !u.broken && !self.broken.contains(&u.uuid)) {
             let path = dir.join(format!("{}.yml", uuid_string(user.uuid)));
             let tmp = path.with_extension("yml.tmp");
             if std::fs::write(&tmp, ess_yaml::to_string(&user.data)).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
                 user.dirty = false;
             }
         }
+    }
+    /// Deletes a user's file from disk, but NEVER deletes broken files.
+    pub fn remove_file(&mut self, uuid: Uuid) -> bool {
+        if self.is_broken(uuid) {
+            return false;
+        }
+        let path = self.file(uuid);
+        if !path.exists() {
+            return false;
+        }
+        if !self.loaded.contains_key(&uuid) {
+            let broken = match std::fs::read_to_string(&path) {
+                Ok(text) => ess_yaml::parse(&text).is_err(),
+                Err(_) => true,
+            };
+            if broken {
+                self.broken.insert(uuid);
+                return false;
+            }
+        }
+        std::fs::remove_file(&path).is_ok()
     }
     fn index_names(&mut self) {
         for uuid in self.all() {
@@ -1746,5 +1804,85 @@ mod tests {
         assert!(!s.pending(b));
         s.tick = 5;
         assert_eq!(s.due().len(), 0);
+    }
+
+    #[test]
+    fn malformed_yaml_userdata_is_never_overwritten() {
+        let mut t = TestServer::with_config("teleport-delay: 0");
+        let uuid = crate::game::ess_testkit::fake_uuid("Alice");
+        let path = t.ess.users.file(uuid);
+        let malformed = b"::: malformed [yaml {content\n\tinvalid: [[[\n";
+        std::fs::write(&path, malformed).expect("write malformed file");
+
+        let alice = t.join("Alice");
+        assert!(t.ess.users.is_broken(alice), "user should be marked broken on load error");
+        t.op("Alice");
+        t.cmd(alice, "/sethome base");
+        assert!(t.ess.users.user(alice).get("homes.base").is_some(), "in-memory session should still work");
+
+        t.ess.users.save();
+        let disk_bytes = std::fs::read(&path).expect("read file after save");
+        assert_eq!(disk_bytes, malformed, "malformed YAML file must remain byte-identical on disk");
+    }
+
+    #[test]
+    fn non_utf8_userdata_is_never_overwritten() {
+        let mut t = TestServer::with_config("teleport-delay: 0");
+        let uuid = crate::game::ess_testkit::fake_uuid("Bob");
+        let path = t.ess.users.file(uuid);
+        let bad_utf8 = vec![0xFF, 0xFE, 0xFD, 0x80, 0x81, 0x82, 0xC0, 0xAF];
+        std::fs::write(&path, &bad_utf8).expect("write invalid utf-8 file");
+
+        let bob = t.join("Bob");
+        assert!(t.ess.users.is_broken(bob), "user should be marked broken on non-utf8 IO error");
+        t.op("Bob");
+        t.cmd(bob, "/sethome base");
+        assert!(t.ess.users.user(bob).get("homes.base").is_some(), "in-memory session should still work");
+
+        t.ess.users.save();
+        let disk_bytes = std::fs::read(&path).expect("read file after save");
+        assert_eq!(disk_bytes, bad_utf8, "non-UTF-8 file must remain byte-identical on disk");
+    }
+
+    #[test]
+    fn normal_userdata_loads_and_saves_as_before() {
+        let mut t = TestServer::with_config("teleport-delay: 0");
+        let uuid = crate::game::ess_testkit::fake_uuid("Carol");
+        let path = t.ess.users.file(uuid);
+        let valid_yaml = "last-account-name: Carol\nmoney: '250'\n";
+        std::fs::write(&path, valid_yaml).expect("write valid file");
+
+        let carol = t.join("Carol");
+        assert!(!t.ess.users.is_broken(carol), "valid user must not be marked broken");
+        assert_eq!(t.ess.users.get(carol).unwrap().name().as_deref(), Some("Carol"));
+        t.op("Carol");
+        t.cmd(carol, "/sethome base");
+
+        t.ess.users.save();
+        let text = std::fs::read_to_string(&path).expect("read valid file");
+        assert!(text.contains("homes"), "saved file must contain homes");
+        assert!(text.contains("base"), "saved file must contain base home");
+        assert!(text.contains("250"), "saved file must preserve money");
+    }
+
+    #[test]
+    fn broken_userdata_is_not_deleted_by_cleanup_or_remove() {
+        let mut t = TestServer::with_config("");
+        let uuid = crate::game::ess_testkit::fake_uuid("Dave");
+        let path = t.ess.users.file(uuid);
+        let malformed = b"bad yaml: [";
+        std::fs::write(&path, malformed).expect("write malformed file");
+
+        assert!(t.ess.users.get(uuid).is_none());
+        assert!(t.ess.users.is_broken(uuid));
+
+        // remove_file refuses to delete broken files
+        assert!(!t.ess.users.remove_file(uuid));
+        assert!(path.exists());
+
+        // /essentials cleanup must not delete broken files
+        t.console("/essentials cleanup 0");
+        assert!(path.exists());
+        assert_eq!(std::fs::read(&path).expect("read file"), malformed);
     }
 }
