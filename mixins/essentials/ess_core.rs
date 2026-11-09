@@ -1130,6 +1130,23 @@ impl Ess {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
+        if path.exists() {
+            let is_corrupt = match std::fs::read_to_string(&path) {
+                Ok(text) => ess_yaml::parse(&text).is_err(),
+                Err(_) => true,
+            };
+            if is_corrupt {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis())
+                    .unwrap_or(0);
+                let backup = PathBuf::from(format!("{}.broken-{now}", path.display()));
+                if std::fs::copy(&path, &backup).is_err() {
+                    return;
+                }
+                eprintln!("[Essentials] Corrupt data file {} backed up to {}", path.display(), backup.display());
+            }
+        }
         let tmp = path.with_extension("tmp");
         if std::fs::write(&tmp, ess_yaml::to_string(value)).is_ok() {
             let _ = std::fs::rename(&tmp, &path);
@@ -1884,5 +1901,79 @@ mod tests {
         t.console("/essentials cleanup 0");
         assert!(path.exists());
         assert_eq!(std::fs::read(&path).expect("read file"), malformed);
+    }
+
+    #[test]
+    fn write_yaml_backs_up_corrupt_files_and_preserves_valid_ones() {
+        let t = TestServer::with_config("");
+        let file = t.ess.dir.join("kits.yml");
+        let corrupt = b"kits:\n  tools:\n    items: [unclosed list";
+        std::fs::write(&file, corrupt).expect("write corrupt kits.yml");
+
+        // Overwrite via write_yaml
+        let new_data = json!({"kits": {"tools": {"delay": 10}}});
+        t.ess.write_yaml("kits.yml", &new_data);
+
+        // Verify the new data was written
+        assert_eq!(t.ess.read_yaml("kits.yml"), new_data);
+
+        // Find the .broken-* backup file
+        let parent = file.parent().unwrap();
+        let backups: Vec<PathBuf> = std::fs::read_dir(parent)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|s| s.starts_with("kits.yml.broken-"))
+            })
+            .collect();
+
+        assert_eq!(backups.len(), 1, "exactly one backup file should be created");
+        assert_eq!(std::fs::read(&backups[0]).unwrap(), corrupt, "backup must be byte-identical to original");
+
+        // Now write over the already valid kits.yml with another update
+        let updated_data = json!({"kits": {"tools": {"delay": 20}}});
+        t.ess.write_yaml("kits.yml", &updated_data);
+
+        // Ensure no new backup was created
+        let backups_after: Vec<PathBuf> = std::fs::read_dir(parent)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|s| s.starts_with("kits.yml.broken-"))
+            })
+            .collect();
+        assert_eq!(backups_after.len(), 1, "no new backup should be created for valid file");
+    }
+
+    #[test]
+    fn write_yaml_backs_up_non_utf8_files() {
+        let t = TestServer::with_config("");
+        let file = t.ess.dir.join("jail.yml");
+        let bad_bytes = vec![0xFF, 0xFE, 0xFD, 0x80];
+        std::fs::write(&file, &bad_bytes).expect("write non-utf8 jail.yml");
+
+        let new_data = json!({"jails": {}});
+        t.ess.write_yaml("jail.yml", &new_data);
+
+        let parent = file.parent().unwrap();
+        let backups: Vec<PathBuf> = std::fs::read_dir(parent)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|s| s.starts_with("jail.yml.broken-"))
+            })
+            .collect();
+
+        assert_eq!(backups.len(), 1, "exactly one backup file should be created for non-utf8 file");
+        assert_eq!(std::fs::read(&backups[0]).unwrap(), bad_bytes, "backup must be byte-identical to original");
     }
 }
